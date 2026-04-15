@@ -748,14 +748,30 @@ function drawHelicorder(samples, snap) {
   for (const q of quakes) {
     if (q.t < tStart || q.t >= tEnd) continue;
     const x = plotX + ((q.t - tStart) / TOTAL) * plotW;
+    let nearest = win[0];
+    let bestDt = Math.abs(win[0].t - q.t);
+    for (let i = 1; i < win.length; i++) {
+      const dt = Math.abs(win[i].t - q.t);
+      if (dt < bestDt) {
+        nearest = win[i];
+        bestDt = dt;
+      }
+    }
+    const centered = nearest[axis.key] - mean;
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.05);
+    const y = yMid - amp;
     ctx.strokeStyle = '#ff3040';
-    ctx.lineWidth = 2 * devicePixelRatio;
-    ctx.shadowBlur = 8;
+    ctx.lineWidth = 2.2 * devicePixelRatio;
+    ctx.shadowBlur = 10;
     ctx.shadowColor = '#ff3040';
     ctx.beginPath();
-    ctx.moveTo(x, plotY + 2);
-    ctx.lineTo(x, plotY + plotH - 2);
+    ctx.moveTo(x, Math.max(plotY + 6, y - 12 * devicePixelRatio));
+    ctx.lineTo(x, Math.min(plotY + plotH - 6, y + 12 * devicePixelRatio));
     ctx.stroke();
+    ctx.fillStyle = '#ff8090';
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5 * devicePixelRatio, 0, 2 * Math.PI);
+    ctx.fill();
     ctx.shadowBlur = 0;
   }
 
