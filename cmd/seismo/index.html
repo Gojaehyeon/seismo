@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>seismo — live seismograph</title>
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #10141c;
+    --border: #1e2530;
+    --fg: #d8deea;
+    --mute: #6b7485;
+    --x: #58a6ff;
+    --y: #ffa657;
+    --z: #3fb950;
+    --accent: #f778ba;
+    --danger: #ff6d6d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
+    font-size: 13px;
+  }
+  header {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
+  header .mute { color: var(--mute); font-size: 12px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 16px;
+    padding: 16px 22px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .panel h2 {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--mute);
+    font-weight: 600;
+  }
+  canvas {
+    width: 100%;
+    background: #07090d;
+    border-radius: 6px;
+    display: block;
+  }
+  .tracks { height: 460px; }
+  .mini   { height: 110px; margin-top: 12px; }
+
+  .big-num {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .label { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px 0;
+  }
+  .meta .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .meta .row:last-child { border-bottom: none; }
+  .meta b {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+
+  .stat-big {
+    text-align: center;
+    padding: 8px 0 14px;
+  }
+
+  .quake-list {
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .quake-list .item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    color: var(--danger);
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px dotted var(--border);
+  }
+  .quake-list .item:last-child { border-bottom: none; }
+  .quake-list .empty { color: var(--mute); font-style: italic; padding: 6px 0; }
+
+  button {
+    background: #161c26;
+    color: var(--fg);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  button:hover { background: #1e2530; }
+
+  .legend { display: flex; gap: 16px; font-size: 11px; color: var(--mute); margin-top: 6px; }
+  .legend span::before { content: "■ "; }
+  .legend .lx { color: var(--x); }
+  .legend .ly { color: var(--y); }
+  .legend .lz { color: var(--z); }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--z);
+    margin-right: 6px;
+    box-shadow: 0 0 8px var(--z);
+  }
+  .status-dot.alert { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>seismo</h1>
+  <span class="mute"><span class="status-dot" id="dot"></span><span id="status">connecting…</span></span>
+  <span class="mute" style="margin-left:auto">apple silicon MEMS IMU · ~100 Hz</span>
+</header>
+
+<div class="grid">
+  <div>
+    <div class="panel">
+      <h2>3-axis trace</h2>
+      <canvas id="tracks" class="tracks" width="2000" height="920"></canvas>
+      <div class="legend">
+        <span class="lx">X</span><span class="ly">Y</span><span class="lz">Z</span>
+        <span style="margin-left:auto; color:var(--mute)">scale: ±0.5g full · window: <span id="winsec">60</span>s</span>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>magnitude envelope</h2>
+      <canvas id="env" class="mini" width="2000" height="220"></canvas>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel stat-big">
+      <div class="label">PGA (since start)</div>
+      <div class="big-num" id="pga">—</div>
+      <button onclick="resetPGA()" style="margin-top:6px">reset</button>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>live stats</h2>
+      <div class="meta">
+        <div class="row"><span>RMS (1 min)</span><b id="rms">—</b></div>
+        <div class="row"><span>STA/LTA ratio</span><b id="stalta">—</b></div>
+        <div class="row"><span>trigger @</span><b id="trig">—</b></div>
+        <div class="row"><span>rate</span><b id="rate">—</b></div>
+        <div class="row"><span>buffer</span><b id="buf">—</b></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>detected events</h2>
+      <div class="quake-list" id="quakes"><div class="empty">no events yet</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvasTracks = document.getElementById('tracks');
+const ctxTracks = canvasTracks.getContext('2d');
+const canvasEnv = document.getElementById('env');
+const ctxEnv = canvasEnv.getContext('2d');
+
+function fit(c) {
+  const r = c.getBoundingClientRect();
+  c.width  = Math.floor(r.width  * devicePixelRatio);
+  c.height = Math.floor(r.height * devicePixelRatio);
+}
+function fitAll() { fit(canvasTracks); fit(canvasEnv); }
+window.addEventListener('resize', fitAll);
+fitAll();
+
+let latest = null;
+
+function drawGrid(ctx, W, H, rows) {
+  ctx.strokeStyle = '#12161e';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < rows; i++) {
+    const y = (H * i / rows) | 0;
+    ctx.moveTo(0, y); ctx.lineTo(W, y);
+  }
+  ctx.stroke();
+}
+
+function drawTrack(ctx, samples, color, yCenter, halfH, scale, accessor) {
+  if (samples.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.2 * devicePixelRatio;
+  ctx.beginPath();
+  samples.forEach((s, i) => {
+    const x = (i / (samples.length - 1)) * ctx.canvas.width;
+    const y = yCenter - accessor(s) * scale;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.strokeStyle = '#1e2530';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, yCenter); ctx.lineTo(ctx.canvas.width, yCenter);
+  ctx.stroke();
+}
+
+function drawTracks(snap) {
+  const W = canvasTracks.width, H = canvasTracks.height;
+  ctxTracks.clearRect(0, 0, W, H);
+  drawGrid(ctxTracks, W, H, 3);
+
+  const samples = snap.samples || [];
+  const thirds = H / 3;
+  const halfH = thirds * 0.45;
+  const scale = halfH / 0.5; // ±0.5g
+
+  drawTrack(ctxTracks, samples, '#58a6ff', thirds * 0.5, halfH, scale, s => s.hx);
+  drawTrack(ctxTracks, samples, '#ffa657', thirds * 1.5, halfH, scale, s => s.hy);
+  drawTrack(ctxTracks, samples, '#3fb950', thirds * 2.5, halfH, scale, s => s.hz);
+
+  // axis labels
+  ctxTracks.fillStyle = '#6b7485';
+  ctxTracks.font = `${11 * devicePixelRatio}px ui-monospace`;
+  ctxTracks.fillText('X', 6 * devicePixelRatio, thirds * 0.5 + 4 * devicePixelRatio);
+  ctxTracks.fillText('Y', 6 * devicePixelRatio, thirds * 1.5 + 4 * devicePixelRatio);
+  ctxTracks.fillText('Z', 6 * devicePixelRatio, thirds * 2.5 + 4 * devicePixelRatio);
+}
+
+function drawEnvelope(snap) {
+  const W = canvasEnv.width, H = canvasEnv.height;
+  ctxEnv.clearRect(0, 0, W, H);
+  drawGrid(ctxEnv, W, H, 4);
+
+  const samples = snap.samples || [];
+  if (samples.length < 2) return;
+
+  // Find peak magnitude for autoscaling (minimum 0.1g)
+  let peak = 0.1;
+  samples.forEach(s => { if (s.m > peak) peak = s.m; });
+
+  ctxEnv.fillStyle = 'rgba(247, 120, 186, 0.15)';
+  ctxEnv.strokeStyle = '#f778ba';
+  ctxEnv.lineWidth = 1.5 * devicePixelRatio;
+  ctxEnv.beginPath();
+  ctxEnv.moveTo(0, H);
+  samples.forEach((s, i) => {
+    const x = (i / (samples.length - 1)) * W;
+    const y = H - (s.m / peak) * H * 0.95;
+    ctxEnv.lineTo(x, y);
+  });
+  ctxEnv.lineTo(W, H);
+  ctxEnv.closePath();
+  ctxEnv.fill();
+
+  ctxEnv.beginPath();
+  samples.forEach((s, i) => {
+    const x = (i / (samples.length - 1)) * W;
+    const y = H - (s.m / peak) * H * 0.95;
+    if (i === 0) ctxEnv.moveTo(x, y); else ctxEnv.lineTo(x, y);
+  });
+  ctxEnv.stroke();
+
+  // Quake markers
+  const quakes = snap.quakes || [];
+  if (samples.length > 0 && quakes.length > 0) {
+    const tStart = samples[0].t, tEnd = samples[samples.length - 1].t;
+    ctxEnv.strokeStyle = '#ff6d6d';
+    ctxEnv.lineWidth = 2 * devicePixelRatio;
+    quakes.forEach(q => {
+      if (q.t < tStart || q.t > tEnd) return;
+      const x = ((q.t - tStart) / (tEnd - tStart)) * W;
+      ctxEnv.beginPath();
+      ctxEnv.moveTo(x, 0); ctxEnv.lineTo(x, H);
+      ctxEnv.stroke();
+    });
+  }
+
+  // Peak scale label
+  ctxEnv.fillStyle = '#6b7485';
+  ctxEnv.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctxEnv.fillText(peak.toFixed(3) + 'g', 6 * devicePixelRatio, 14 * devicePixelRatio);
+}
+
+function renderStats(snap) {
+  const s = snap.stats || {};
+  document.getElementById('pga').textContent = (s.pga || 0).toFixed(4) + 'g';
+  document.getElementById('rms').textContent = (s.rms || 0).toFixed(5) + 'g';
+  document.getElementById('stalta').textContent = (s.sta_lta || 0).toFixed(2);
+  document.getElementById('trig').textContent = (s.trigger || 0).toFixed(1) + '×';
+  document.getElementById('rate').textContent = (s.rate_hz || 0) + ' Hz';
+  document.getElementById('buf').textContent = `${s.filled || 0}/${(s.window_s || 0) * (s.rate_hz || 100)}`;
+  document.getElementById('winsec').textContent = s.window_s || 60;
+
+  const dot = document.getElementById('dot');
+  if ((s.sta_lta || 0) > (s.trigger || 4)) dot.classList.add('alert');
+  else dot.classList.remove('alert');
+}
+
+function renderQuakes(snap) {
+  const list = document.getElementById('quakes');
+  const qs = (snap.quakes || []).slice().reverse();
+  if (qs.length === 0) {
+    list.innerHTML = '<div class="empty">no events yet</div>';
+    return;
+  }
+  list.innerHTML = qs.map(q => `
+    <div class="item">
+      <span>t+${q.t.toFixed(1)}s</span>
+      <span>${q.peak.toFixed(3)}g · ${q.ratio.toFixed(1)}×</span>
+    </div>
+  `).join('');
+}
+
+function draw() {
+  if (latest) {
+    drawTracks(latest);
+    drawEnvelope(latest);
+    renderStats(latest);
+    renderQuakes(latest);
+  }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+const es = new EventSource('/stream');
+es.onopen = () => document.getElementById('status').textContent = 'streaming';
+es.onerror = () => document.getElementById('status').textContent = 'disconnected';
+es.onmessage = (e) => {
+  try { latest = JSON.parse(e.data); } catch {}
+};
+
+async function resetPGA() {
+  await fetch('/reset', {method:'POST'}).catch(()=>{});
+}
+</script>
+</body>
+</html>

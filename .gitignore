@@ -1,0 +1,14 @@
+# binaries
+/seismo
+/cmd/seismo/seismo
+
+# recordings
+*.csv
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# go
+vendor/
