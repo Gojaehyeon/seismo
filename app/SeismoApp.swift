@@ -24,7 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let tagRMS     = 4
     private let tagSTALTA  = 5
     private let tagQuakes  = 6
-    private let tagDisable = 7
+    private let tagRepair  = 7
+    private let tagDisable = 8
 
     // State
     private var lastQuakeCount = 0
@@ -72,6 +73,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         enable.target = self
         enable.tag = tagEnable
         menu.addItem(enable)
+
+        let repair = NSMenuItem(title: "repair helper registration…",
+                                action: #selector(repairHelper),
+                                keyEquivalent: "")
+        repair.target = self
+        repair.tag = tagRepair
+        repair.isHidden = true
+        menu.addItem(repair)
 
         menu.addItem(.separator())
 
@@ -139,44 +148,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func enableHelper() {
         if helperService.status == .enabled {
-            showAlert("already enabled",
-                      "The seismo helper is already registered and running.")
+            repairHelper()
             return
         }
 
-        do {
-            try helperService.register()
-        } catch {
-            showAlert("couldn't register helper",
-                      """
-                      \(error.localizedDescription)
+        registerHelper(afterRefresh: false)
+    }
 
-                      Try: System Settings → General → Login Items & Extensions, \
-                      find "Seismo" and toggle it on.
-                      """,
-                      openSettings: true)
-            return
+    @objc private func repairHelper() {
+        if helperService.status == .enabled {
+            do {
+                try helperService.unregister()
+                Thread.sleep(forTimeInterval: 0.25)
+            } catch {
+                showAlert("couldn't refresh helper",
+                          """
+                          \(error.localizedDescription)
+
+                          If the old helper is stuck, disable it in System Settings → General → Login Items & Extensions and try again.
+                          """,
+                          openSettings: true)
+                fetchState()
+                return
+            }
         }
 
-        switch helperService.status {
-        case .enabled:
-            showAlert("helper enabled",
-                      "The seismo helper is now running as a LaunchDaemon. Open the dashboard to see the live trace!")
-        case .requiresApproval:
-            showAlert("approval needed",
-                      """
-                      macOS is asking you to approve the seismo helper.
-
-                      Open System Settings → General → Login Items & Extensions \
-                      and toggle "Seismo" on.
-                      """,
-                      openSettings: true)
-        default:
-            showAlert("status: \(statusName(helperService.status))",
-                      "Unexpected state. Check Console.app for 'seismo' if it does not start.",
-                      openSettings: true)
-        }
-        fetchState()
+        registerHelper(afterRefresh: true)
     }
 
     @objc private func disableHelper() {
@@ -274,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let text: String
         switch s {
         case .notRegistered:    text = "status: helper not installed"
-        case .enabled:          text = "status: helper loading…"
+        case .enabled:          text = "status: helper enabled, API offline"
         case .requiresApproval: text = "status: approval required"
         case .notFound:         text = "status: helper binary missing"
         @unknown default:       text = "status: unknown"
@@ -282,6 +279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu?.item(withTag: tagStatus)?.title = text
 
         statusItem.menu?.item(withTag: tagEnable)?.isHidden  = (s == .enabled)
+        statusItem.menu?.item(withTag: tagRepair)?.isHidden  = (s != .enabled)
         statusItem.menu?.item(withTag: tagDisable)?.isHidden = (s != .enabled)
     }
 
@@ -297,6 +295,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem.menu?.item(withTag: tagStatus)?.title = "status: running"
         statusItem.menu?.item(withTag: tagEnable)?.isHidden = true
+        statusItem.menu?.item(withTag: tagRepair)?.isHidden = false
         statusItem.menu?.item(withTag: tagDisable)?.isHidden = false
 
         statusItem.menu?.item(withTag: tagPGA)?.title =
@@ -321,6 +320,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Compact live PGA next to the idle icon.
             statusItem.button?.title = iconIdle + String(format: " %.3fg", pga)
         }
+    }
+
+    private func registerHelper(afterRefresh: Bool) {
+        do {
+            try helperService.register()
+        } catch {
+            showAlert(afterRefresh ? "couldn't refresh helper" : "couldn't register helper",
+                      """
+                      \(error.localizedDescription)
+
+                      Try: System Settings → General → Login Items & Extensions, \
+                      find "Seismo" and toggle it on.
+                      """,
+                      openSettings: true)
+            return
+        }
+
+        switch helperService.status {
+        case .enabled:
+            showAlert(afterRefresh ? "helper refreshed" : "helper enabled",
+                      afterRefresh
+                      ? "The helper registration was refreshed. If the dashboard was stuck, try opening it again."
+                      : "The seismo helper is now running as a LaunchDaemon. Open the dashboard to see the live trace!")
+        case .requiresApproval:
+            showAlert("approval needed",
+                      """
+                      macOS is asking you to approve the seismo helper.
+
+                      Open System Settings → General → Login Items & Extensions \
+                      and toggle "Seismo" on.
+                      """,
+                      openSettings: true)
+        default:
+            showAlert("status: \(statusName(helperService.status))",
+                      "Unexpected state. Check Console.app for 'seismo' if it does not start.",
+                      openSettings: true)
+        }
+        fetchState()
     }
 }
 

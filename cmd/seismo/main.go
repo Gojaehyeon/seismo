@@ -3,7 +3,7 @@
 // Reads the undocumented AppleSPU MEMS IMU (Bosch BMI286) at ~100 Hz via
 // IOKit HID and serves a 3-axis seismograph UI on http://127.0.0.1:8766.
 //
-//   sudo seismo
+//	sudo seismo
 //
 // Root is required for IOKit HID access.
 package main
@@ -12,10 +12,12 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -70,11 +72,11 @@ type Bus struct {
 	filled    int
 
 	// running stats over the rolling window
-	pga     float64 // peak ground acceleration (g)
-	rms     float64 // rolling RMS
-	staLTA  float64 // latest STA/LTA ratio
-	sta     float64
-	lta     float64
+	pga              float64 // peak ground acceleration (g)
+	rms              float64 // rolling RMS
+	staLTA           float64 // latest STA/LTA ratio
+	sta              float64
+	lta              float64
 	triggerThreshold float64
 	lastTriggered    time.Time
 
@@ -184,15 +186,33 @@ func (b *Bus) snapshot(decim int) map[string]any {
 	if decim < 1 {
 		decim = 1
 	}
+	// Peak-preserving decimation: each output point keeps the xyz of the
+	// bucket's first sample but the max magnitude seen across the whole
+	// bucket so brief events (taps) are never averaged out of existence.
 	out := make([]Reading, 0, b.filled/decim+1)
 	var rmsSum float64
+	var bucketPeak float64
+	var bucketStart Reading
+	var bucketActive bool
 	for i := range b.filled {
 		idx := (b.head - b.filled + i + b.windowCap) % b.windowCap
 		r := b.window[idx]
 		rmsSum += r.M * r.M
 		if i%decim == 0 {
-			out = append(out, r)
+			if bucketActive {
+				bucketStart.M = bucketPeak
+				out = append(out, bucketStart)
+			}
+			bucketStart = r
+			bucketPeak = r.M
+			bucketActive = true
+		} else if r.M > bucketPeak {
+			bucketPeak = r.M
 		}
+	}
+	if bucketActive {
+		bucketStart.M = bucketPeak
+		out = append(out, bucketStart)
 	}
 	if b.filled > 0 {
 		b.rms = math.Sqrt(rmsSum / float64(b.filled))
@@ -301,17 +321,20 @@ func main() {
 		}
 	}()
 
-	startHTTPServer(*fAddr, bus)
+	httpErrCh, err := startHTTPServer(ctx, *fAddr, bus)
+	if err != nil {
+		log.Fatalf("http listen %s: %v", *fAddr, err)
+	}
 	fmt.Printf("seismo: listening on http://%s/  (window=%ds, trigger STA/LTA=%.1f)\n",
 		*fAddr, *fWindow, *fTrigger)
 	if *fRecord != "" {
 		fmt.Printf("  recording to %s\n", *fRecord)
 	}
 
-	runSensorLoop(ctx, accelRing, bus, sensorErrCh)
+	runSensorLoop(ctx, accelRing, bus, sensorErrCh, httpErrCh)
 }
 
-func runSensorLoop(ctx context.Context, ring *shm.RingBuffer, bus *Bus, errCh <-chan error) {
+func runSensorLoop(ctx context.Context, ring *shm.RingBuffer, bus *Bus, sensorErrCh, httpErrCh <-chan error) {
 	ticker := time.NewTicker(8 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -321,8 +344,10 @@ func runSensorLoop(ctx context.Context, ring *shm.RingBuffer, bus *Bus, errCh <-
 		case <-ctx.Done():
 			fmt.Println("\nbye!")
 			return
-		case err := <-errCh:
+		case err := <-sensorErrCh:
 			log.Fatalf("sensor worker: %v", err)
+		case err := <-httpErrCh:
+			log.Fatalf("http server: %v", err)
 		case <-ticker.C:
 		}
 
@@ -334,7 +359,7 @@ func runSensorLoop(ctx context.Context, ring *shm.RingBuffer, bus *Bus, errCh <-
 	}
 }
 
-func startHTTPServer(addr string, bus *Bus) {
+func startHTTPServer(ctx context.Context, addr string, bus *Bus) (<-chan error, error) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -388,9 +413,26 @@ func startHTTPServer(addr string, bus *Bus) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	srv := &http.Server{Handler: mux}
+	errCh := make(chan error, 1)
+
 	go func() {
-		if err := http.ListenAndServe(addr, mux); err != nil {
-			log.Printf("http: %v", err)
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+
+	go func() {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
 		}
 	}()
+
+	return errCh, nil
 }

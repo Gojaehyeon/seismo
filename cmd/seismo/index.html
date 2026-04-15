@@ -436,7 +436,7 @@
     <span class="bracket bl"></span><span class="bracket br"></span>
     <h2>
       PEAK GROUND ACCEL
-      <span class="sub">SINCE START</span>
+      <span class="sub">LIVE PEAK · DECAY</span>
       <span class="pill" id="pga-unit-pill">G</span>
     </h2>
     <canvas id="pga"></canvas>
@@ -556,6 +556,11 @@ let latest = null;
 const specHistory = []; // rolling frames of FFT magnitudes
 const SPEC_HISTORY_COLS = 180;
 const SPEC_BINS = 64; // first 64 bins of 128-bin half-spectrum
+const AXES = [
+  { key: 'hx', color: '#4be0ff', glow: 'rgba(75, 224, 255, 0.65)', label: 'X' },
+  { key: 'hy', color: '#ffb21c', glow: 'rgba(255, 178, 28, 0.65)', label: 'Y' },
+  { key: 'hz', color: '#3dff85', glow: 'rgba(61, 255, 133, 0.70)', label: 'Z' },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────
 const pad = (n) => String(n).padStart(2, '0');
@@ -635,6 +640,35 @@ function computeSpectrumFromRecent(recent) {
   while (specHistory.length > SPEC_HISTORY_COLS) specHistory.shift();
 }
 
+function dominantAxis(rowPts) {
+  let best = AXES[0];
+  let bestEnergy = -1;
+  for (const axis of AXES) {
+    let sumSq = 0;
+    for (const s of rowPts) sumSq += s[axis.key] * s[axis.key];
+    if (sumSq > bestEnergy) {
+      best = axis;
+      bestEnergy = sumSq;
+    }
+  }
+  return best;
+}
+
+function boostedCenteredWave(v, ref) {
+  const n = Math.max(-1, Math.min(1, v / ref));
+  return Math.sign(n) * Math.pow(Math.abs(n), 0.82);
+}
+
+function recentLiveMagnitude(recent) {
+  if (!recent || recent.length === 0) return 0;
+  let peak = 0;
+  const start = Math.max(0, recent.length - 3);
+  for (let i = start; i < recent.length; i++) {
+    if (recent[i].m > peak) peak = recent[i].m;
+  }
+  return peak;
+}
+
 // ─── Drawing: Helicorder ─────────────────────────────────────
 function drawHelicorder(samples, snap) {
   const C = cv.heli, ctx = cx.heli;
@@ -644,86 +678,130 @@ function drawHelicorder(samples, snap) {
   ctx.fillRect(0, 0, W, H);
   if (!samples || samples.length < 2) return;
 
-  const ROWS = 10, ROW_SEC = 60, TOTAL = ROWS * ROW_SEC;
+  const TOTAL = 3 * 60;
   const tEnd = samples[samples.length - 1].t;
   const tStart = tEnd - TOTAL;
-  const rowH = H / ROWS;
-  const labelW = 70 * devicePixelRatio;
-  const plotW = W - labelW - (8 * devicePixelRatio);
+  const padL = 18 * devicePixelRatio;
+  const padR = 16 * devicePixelRatio;
+  const padT = 18 * devicePixelRatio;
+  const padB = 24 * devicePixelRatio;
+  const plotX = padL;
+  const plotY = padT;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const yMid = plotY + plotH / 2;
+  const X_TICKS = 4;
+  const win = samples.filter(s => s.t >= tStart);
+  if (win.length < 2) return;
 
-  let peak = 0.01;
-  for (const s of samples) if (s.t >= tStart && s.m > peak) peak = s.m;
+  const axis = dominantAxis(win);
+  let mean = 0;
+  for (const s of win) mean += s[axis.key];
+  mean /= win.length;
+
+  let peakAbs = 0.0025;
+  let avgAbs = 0;
+  for (const s of win) {
+    const centered = Math.abs(s[axis.key] - mean);
+    peakAbs = Math.max(peakAbs, centered);
+    avgAbs += centered;
+  }
+  avgAbs /= win.length;
+  const ref = Math.max(0.00022, avgAbs * 5.5);
 
   // Grid
   ctx.strokeStyle = 'rgba(36, 52, 73, 0.55)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let i = 0; i <= ROWS; i++) {
-    const y = (i * rowH) | 0;
-    ctx.moveTo(labelW, y + 0.5); ctx.lineTo(W, y + 0.5);
-  }
   for (let i = 0; i <= 6; i++) {
-    const x = labelW + ((plotW * i / 6) | 0);
-    ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H);
+    const y = plotY + ((plotH * i) / 6 | 0);
+    ctx.moveTo(plotX, y + 0.5);
+    ctx.lineTo(plotX + plotW, y + 0.5);
+  }
+  for (let i = 0; i <= X_TICKS; i++) {
+    const x = plotX + ((plotW * i) / X_TICKS | 0);
+    ctx.moveTo(x + 0.5, plotY);
+    ctx.lineTo(x + 0.5, plotY + plotH);
   }
   ctx.stroke();
 
-  const startUnix = (snap.stats && snap.stats.start_unix) || (Date.now() / 1000);
-  const tToWall = (t) => new Date((startUnix + t) * 1000);
+  // Center line
+  ctx.strokeStyle = 'rgba(128, 150, 176, 0.28)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(plotX, yMid + 0.5);
+  ctx.lineTo(plotX + plotW, yMid + 0.5);
+  ctx.stroke();
 
-  for (let row = 0; row < ROWS; row++) {
-    const rs = tStart + row * ROW_SEC;
-    const re2 = rs + ROW_SEC;
-    const yMid = row * rowH + rowH / 2;
+  // Single flowing stock-chart-like line.
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = axis.glow;
+  ctx.strokeStyle = axis.color;
+  ctx.lineWidth = 1.6 * devicePixelRatio;
+  ctx.beginPath();
+  win.forEach((s, i) => {
+    const x = plotX + ((s.t - tStart) / TOTAL) * plotW;
+    const centered = s[axis.key] - mean;
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.18);
+    const y = yMid - amp;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.shadowBlur = 0;
 
-    const wall = tToWall(rs);
-    ctx.fillStyle = '#5a6a82';
-    ctx.font = `${11 * devicePixelRatio}px ui-monospace, monospace`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`,
-                 8 * devicePixelRatio, yMid);
-
-    const rowPts = samples.filter(s => s.t >= rs && s.t < re2);
-    if (rowPts.length < 2) continue;
-
-    // Trace with amber glow
-    ctx.shadowBlur = 4;
-    ctx.shadowColor = 'rgba(255, 178, 28, 0.6)';
-    ctx.strokeStyle = '#ffb21c';
-    ctx.lineWidth = 1 * devicePixelRatio;
-    ctx.beginPath();
-    rowPts.forEach((s, i) => {
-      const x = labelW + ((s.t - rs) / ROW_SEC) * plotW;
-      const amp = (s.m / peak) * (rowH * 0.48);
-      const sign = i % 2 === 0 ? 1 : -1;
-      const y = yMid - sign * amp;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Event markers
-    const quakes = (snap.quakes) || [];
-    for (const q of quakes) {
-      if (q.t < rs || q.t >= re2) continue;
-      const x = labelW + ((q.t - rs) / ROW_SEC) * plotW;
-      ctx.strokeStyle = '#ff3040';
-      ctx.lineWidth = 2 * devicePixelRatio;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = '#ff3040';
-      ctx.beginPath();
-      ctx.moveTo(x, row * rowH + 2);
-      ctx.lineTo(x, (row + 1) * rowH - 2);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+  // Event markers
+  const quakes = snap.quakes || [];
+  for (const q of quakes) {
+    if (q.t < tStart || q.t >= tEnd) continue;
+    const x = plotX + ((q.t - tStart) / TOTAL) * plotW;
+    let nearest = win[0];
+    let bestDt = Math.abs(win[0].t - q.t);
+    for (let i = 1; i < win.length; i++) {
+      const dt = Math.abs(win[i].t - q.t);
+      if (dt < bestDt) {
+        nearest = win[i];
+        bestDt = dt;
+      }
     }
+    const centered = nearest[axis.key] - mean;
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.06);
+    const y = yMid - amp;
+    ctx.strokeStyle = '#ff3040';
+    ctx.lineWidth = 2.2 * devicePixelRatio;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ff3040';
+    ctx.beginPath();
+    ctx.moveTo(x, Math.max(plotY + 6, y - 12 * devicePixelRatio));
+    ctx.lineTo(x, Math.min(plotY + plotH - 6, y + 12 * devicePixelRatio));
+    ctx.stroke();
+    ctx.fillStyle = '#ff8090';
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5 * devicePixelRatio, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
+  // Time labels
+  const startUnix = (snap.stats && snap.stats.start_unix) || (Date.now() / 1000);
+  ctx.fillStyle = '#5a6a82';
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace, monospace`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= X_TICKS; i++) {
+    const t = tStart + (TOTAL * i / X_TICKS);
+    const wall = new Date((startUnix + t) * 1000);
+    const x = plotX + (plotW * i / X_TICKS);
+    ctx.fillText(`${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`, x, plotY + plotH + 6 * devicePixelRatio);
+  }
+
+  // Info tags
   ctx.fillStyle = '#8096b0';
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.textBaseline = 'top';
-  ctx.fillText(`PEAK ${peak.toFixed(3)} G`,
-               W - (110 * devicePixelRatio), 6 * devicePixelRatio);
+  ctx.textAlign = 'left';
+  ctx.fillText(`FLOW · ${axis.label}-AXIS · CENTERED · BASELINE SCALED · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
+  ctx.textAlign = 'right';
+  ctx.fillText(`WINDOW 3 MIN`, W - padR, 4 * devicePixelRatio);
 }
 
 // ─── Drawing: 3-axis Waveform ────────────────────────────────
@@ -952,8 +1030,9 @@ function drawParticle(recent) {
 }
 
 // ─── Drawing: PGA semicircle gauge ───────────────────────────
-let gaugeDisplay = 0; // smoothed
-function drawGauge(pga) {
+let gaugeDisplay = 0;
+let gaugeLastFrame = performance.now();
+function drawGauge(recent, peakPGA) {
   const C = cv.pga, ctx = cx.pga;
   const W = C.width, H = C.height;
   ctx.clearRect(0, 0, W, H);
@@ -963,8 +1042,18 @@ function drawGauge(pga) {
   const cX = W / 2, cY = H * 0.82;
   const R = Math.min(W * 0.42, H * 0.78);
 
-  // Smooth needle (snappier response)
-  gaugeDisplay += (pga - gaugeDisplay) * 0.35;
+  // Ballistic peak hold: slam upward on impact, then bleed down.
+  const now = performance.now();
+  const dt = Math.min(0.1, Math.max(0.001, (now - gaugeLastFrame) / 1000));
+  gaugeLastFrame = now;
+  const livePeak = recentLiveMagnitude(recent);
+  const attack = 1 - Math.exp(-dt / 0.045);
+  const release = Math.exp(-dt / 1.35);
+  if (livePeak >= gaugeDisplay) {
+    gaugeDisplay += (livePeak - gaugeDisplay) * attack;
+  } else {
+    gaugeDisplay *= release;
+  }
 
   const MAX_G = 0.5;
   const frac = Math.min(1, Math.max(0, gaugeDisplay / MAX_G));
@@ -1043,11 +1132,11 @@ function drawGauge(pga) {
   ctx.textBaseline = 'top';
   ctx.shadowBlur = 10;
   ctx.shadowColor = 'rgba(255, 178, 28, 0.5)';
-  ctx.fillText(pga.toFixed(4), cX, cY + 12 * devicePixelRatio);
+  ctx.fillText(gaugeDisplay.toFixed(4), cX, cY + 12 * devicePixelRatio);
   ctx.shadowBlur = 0;
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.fillStyle = '#5a6a82';
-  ctx.fillText(`G · MAX ${MAX_G.toFixed(1)}`, cX, cY + 46 * devicePixelRatio);
+  ctx.fillText(`LIVE HOLD · TRUE MAX ${peakPGA.toFixed(4)} G`, cX, cY + 46 * devicePixelRatio);
 
   // Zone labels
   ctx.font = `${9 * devicePixelRatio}px ui-monospace`;
@@ -1143,7 +1232,7 @@ function render() {
     drawTrace(latest.samples || []);
     drawSpectrogram();
     drawParticle(latest.recent || []);
-    drawGauge((latest.stats || {}).pga || 0);
+    drawGauge(latest.recent || [], (latest.stats || {}).pga || 0);
     updateReadouts(latest);
     renderEvents(latest);
   }
@@ -1155,7 +1244,7 @@ requestAnimationFrame(render);
 // ─── Poll /state — drives everything ────────────────────────
 async function poll() {
   try {
-    const r = await fetch('/state?decim=60');
+    const r = await fetch('/state?decim=20');
     if (r.ok) {
       latest = await r.json();
       // Feed FFT history
@@ -1163,7 +1252,7 @@ async function poll() {
     }
   } catch {}
 }
-setInterval(poll, 80); // ~12 Hz — fast-moving waterfall + traces
+setInterval(poll, 50); // 20 Hz — crisp waterfall + instant tap response
 poll();
 
 async function resetPGA() {
