@@ -36,7 +36,7 @@ sudo ./seismo
 
 Open the URL in your browser. You get:
 
-- **3-axis trace** (X/Y/Z over the last 60 seconds, high-pass filtered)
+- **3-axis trace** (X/Y/Z over the last 10 minutes by default, high-pass filtered)
 - **Magnitude envelope** with red vertical bars at detected events
 - **PGA** (peak ground acceleration, since start)
 - **RMS** over the window
@@ -48,11 +48,12 @@ Open the URL in your browser. You get:
 
 ```
 -addr     HTTP bind address               (default 127.0.0.1:8766)
--window   waveform window in seconds      (default 60)
+-window   waveform window in seconds      (default 600)
 -sta      STA window in seconds           (default 0.5)
 -lta      LTA window in seconds           (default 10.0)
 -trigger  STA/LTA ratio to flag an event  (default 4.0)
 -record   CSV file to append samples to   (optional)
+-mock     synthetic sensor demo mode      (default false)
 ```
 
 ### Record raw data
@@ -62,6 +63,32 @@ sudo ./seismo -record ~/seismo.csv
 ```
 
 Columns: `t,x,y,z,hx,hy,hz,mag` (raw g, high-pass g, magnitude g).
+
+### Run without hardware access
+
+```bash
+./seismo --mock
+```
+
+This starts the full dashboard without IOKit or `sudo`, using a synthetic
+background noise + damped-event generator so you can tune the UI and event
+detector on any dev machine.
+
+### Build the menu bar app
+
+```bash
+./app/build.sh
+open app/Seismo.app
+```
+
+`Seismo.app` wraps the Go helper in a macOS menu bar app. To let the helper
+run as a LaunchDaemon, copy the app into `/Applications`, launch it, and use
+the **enable helper…** menu item if macOS asks for approval in **System
+Settings → General → Login Items & Extensions**.
+
+The default build uses ad-hoc signing so it is suitable for local development
+on your own machine. For distribution outside your Mac, sign both the app and
+helper with a Developer ID identity and notarize the bundle.
 
 ## Why sudo
 

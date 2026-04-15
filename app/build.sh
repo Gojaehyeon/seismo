@@ -13,6 +13,7 @@ BUNDLE_ID="com.gojaehyeon.seismo"
 HELPER_LABEL="com.gojaehyeon.seismo.helper"
 APP_DIR="${APP_NAME}.app"
 CONTENTS="${APP_DIR}/Contents"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 
 if ! command -v swiftc >/dev/null; then
   echo "error: swiftc not found. install Xcode CLT: xcode-select --install" >&2
@@ -95,10 +96,15 @@ cat > "${CONTENTS}/Library/LaunchDaemons/${HELPER_LABEL}.plist" <<HPLIST
 </plist>
 HPLIST
 
-echo "==> ad-hoc code-sign (deep)"
-codesign --force --sign - "${CONTENTS}/MacOS/seismo-helper"
-codesign --force --sign - "${CONTENTS}/MacOS/${APP_NAME}"
-codesign --force --deep --sign - "${APP_DIR}"
+echo "==> code-signing bundle"
+codesign --force --sign "${SIGN_IDENTITY}" "${CONTENTS}/MacOS/seismo-helper"
+codesign --force --sign "${SIGN_IDENTITY}" "${CONTENTS}/MacOS/${APP_NAME}"
+codesign --force --deep --sign "${SIGN_IDENTITY}" "${APP_DIR}"
+
+if [[ "${SIGN_IDENTITY}" == "-" ]]; then
+  echo "warning: built with ad-hoc signing only."
+  echo "         For distribution, rebuild with SIGN_IDENTITY='Developer ID Application: ...' and notarize the app."
+fi
 
 echo ""
 echo "✓ built ${APP_DIR}"
