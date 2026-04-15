@@ -37,6 +37,7 @@ var (
 	fSTAWin  = flag.Float64("sta", 0.5, "STA (short-term average) window in seconds")
 	fLTAWin  = flag.Float64("lta", 10.0, "LTA (long-term average) window in seconds")
 	fTrigger = flag.Float64("trigger", 4.0, "STA/LTA ratio threshold to flag an event")
+	fMock    = flag.Bool("mock", false, "use synthetic sensor (no IOKit, no sudo) — for the UI demo")
 )
 
 // sampleRate is the effective rate after IMU decimation (8x from ~800Hz).
@@ -226,8 +227,9 @@ func (b *Bus) resetPGA() {
 func main() {
 	flag.Parse()
 
-	if os.Geteuid() != 0 {
+	if !*fMock && os.Geteuid() != 0 {
 		fmt.Fprintln(os.Stderr, "seismo: requires root for IOKit HID access → sudo seismo")
+		fmt.Fprintln(os.Stderr, "        (or pass --mock for the synthetic demo)")
 		os.Exit(1)
 	}
 
@@ -249,14 +251,19 @@ func main() {
 	defer gyroRing.Unlink()
 
 	sensorErrCh := make(chan error, 1)
-	go func() {
-		if err := sensor.Run(sensor.Config{
-			AccelRing: accelRing,
-			GyroRing:  gyroRing,
-		}); err != nil {
-			sensorErrCh <- err
-		}
-	}()
+	if *fMock {
+		fmt.Println("seismo: running with synthetic sensor (--mock)")
+		go runMockSensor(accelRing)
+	} else {
+		go func() {
+			if err := sensor.Run(sensor.Config{
+				AccelRing: accelRing,
+				GyroRing:  gyroRing,
+			}); err != nil {
+				sensorErrCh <- err
+			}
+		}()
+	}
 	time.Sleep(250 * time.Millisecond)
 
 	bus := newBus(*fWindow, *fTrigger, *fRecord)

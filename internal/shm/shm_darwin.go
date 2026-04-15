@@ -20,8 +20,8 @@ const (
 	AccelScale = 65536.0
 	GyroScale  = 65536.0
 
-	NameAccel = "knocker_accel"
-	NameGyro  = "knocker_gyro"
+	NameAccel = "seismo_accel"
+	NameGyro  = "seismo_gyro"
 )
 
 type Sample struct {
