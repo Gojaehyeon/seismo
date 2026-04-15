@@ -678,7 +678,7 @@ function drawHelicorder(samples, snap) {
   ctx.fillRect(0, 0, W, H);
   if (!samples || samples.length < 2) return;
 
-  const TOTAL = 10 * 60;
+  const TOTAL = 3 * 60;
   const tEnd = samples[samples.length - 1].t;
   const tStart = tEnd - TOTAL;
   const padL = 18 * devicePixelRatio;
@@ -736,7 +736,7 @@ function drawHelicorder(samples, snap) {
   win.forEach((s, i) => {
     const x = plotX + ((s.t - tStart) / TOTAL) * plotW;
     const centered = s[axis.key] - mean;
-    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.05);
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.15);
     const y = yMid - amp;
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
@@ -793,9 +793,9 @@ function drawHelicorder(samples, snap) {
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.fillText(`FLOW · ${axis.label}-AXIS · CENTERED · 0.5X GAIN · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
+  ctx.fillText(`FLOW · ${axis.label}-AXIS · CENTERED · 1.5X GAIN · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
   ctx.textAlign = 'right';
-  ctx.fillText(`WINDOW 10 MIN`, W - padR, 4 * devicePixelRatio);
+  ctx.fillText(`WINDOW 3 MIN`, W - padR, 4 * devicePixelRatio);
 }
 
 // ─── Drawing: 3-axis Waveform ────────────────────────────────
