@@ -17,10 +17,10 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			EDn1f/cu52KrQzmiypHRidZDvHw=
+			rVwYRsawYQ0LpR5THZpXcGZyNCs=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"1039f57ff72ee762ab4339a2ca91d189d643bc7c"</string>
+			<string>identifier "seismo-helper" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: Jahyeon Ko (76VH4C65NV)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 	</dict>
 	<key>rules</key>

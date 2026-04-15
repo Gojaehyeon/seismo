@@ -659,10 +659,10 @@ function boostedCenteredWave(v, ref) {
   return Math.sign(n) * Math.pow(Math.abs(n), 0.72);
 }
 
-function recentPeakMagnitude(recent) {
+function recentLiveMagnitude(recent) {
   if (!recent || recent.length === 0) return 0;
   let peak = 0;
-  const start = Math.max(0, recent.length - 12);
+  const start = Math.max(0, recent.length - 3);
   for (let i = start; i < recent.length; i++) {
     if (recent[i].m > peak) peak = recent[i].m;
   }
@@ -1019,7 +1019,7 @@ function drawGauge(recent, peakPGA) {
   const now = performance.now();
   const dt = Math.min(0.1, Math.max(0.001, (now - gaugeLastFrame) / 1000));
   gaugeLastFrame = now;
-  const livePeak = recentPeakMagnitude(recent);
+  const livePeak = recentLiveMagnitude(recent);
   const attack = 1 - Math.exp(-dt / 0.045);
   const release = Math.exp(-dt / 1.35);
   if (livePeak >= gaugeDisplay) {
