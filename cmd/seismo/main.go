@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -32,7 +33,7 @@ var indexHTML []byte
 
 var (
 	fAddr    = flag.String("addr", "127.0.0.1:8766", "HTTP bind address")
-	fWindow  = flag.Int("window", 60, "waveform window in seconds")
+	fWindow  = flag.Int("window", 600, "waveform window in seconds (default: 10 minutes)")
 	fRecord  = flag.String("record", "", "CSV file to append samples to (optional)")
 	fSTAWin  = flag.Float64("sta", 0.5, "STA (short-term average) window in seconds")
 	fLTAWin  = flag.Float64("lta", 10.0, "LTA (long-term average) window in seconds")
@@ -203,17 +204,31 @@ func (b *Bus) snapshot(decim int) map[string]any {
 		quakes = append(quakes, b.quakes[idx])
 	}
 
+	host, _ := os.Hostname()
+	uptime := time.Since(b.start).Seconds()
+
+	// Derive a few conveniences for the UI so it doesn't have to reinvent them.
+	// 1 g ≈ 980.665 gal, 1 g ≈ 9.80665 m/s².
+	const g2gal = 980.665
+	const g2ms2 = 9.80665
+
 	return map[string]any{
 		"samples": out,
 		"quakes":  quakes,
 		"stats": map[string]any{
-			"pga":       b.pga,
-			"rms":       b.rms,
-			"sta_lta":   b.staLTA,
-			"window_s":  *fWindow,
-			"rate_hz":   sampleRate,
-			"trigger":   b.triggerThreshold,
-			"filled":    b.filled,
+			"pga":        b.pga,
+			"pga_gal":    b.pga * g2gal,
+			"pga_ms2":    b.pga * g2ms2,
+			"rms":        b.rms,
+			"sta_lta":    b.staLTA,
+			"window_s":   *fWindow,
+			"rate_hz":    sampleRate,
+			"trigger":    b.triggerThreshold,
+			"filled":     b.filled,
+			"host":       host,
+			"uptime_s":   uptime,
+			"start_unix": b.start.Unix(),
+			"go":         runtime.Version(),
 		},
 	}
 }

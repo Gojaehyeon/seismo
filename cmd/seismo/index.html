@@ -2,367 +2,555 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>seismo — live seismograph</title>
+<title>SEISMO · live MacBook seismograph</title>
 <style>
   :root {
-    --bg: #07090d;
-    --panel: #10141c;
-    --border: #1e2530;
-    --fg: #d8deea;
-    --mute: #6b7485;
-    --x: #58a6ff;
-    --y: #ffa657;
-    --z: #3fb950;
-    --accent: #f778ba;
-    --danger: #ff6d6d;
+    --bg-0: #04060a;
+    --bg-1: #080c14;
+    --bg-2: #0d131e;
+    --line: #14202e;
+    --line-2: #1e2c3e;
+    --fg: #d8e0ea;
+    --dim: #5b6b7d;
+    --dim-2: #3a4858;
+    --amber: #ffb347;
+    --cyan: #4be0ff;
+    --green: #66d9a4;
+    --red: #ff4f6a;
+    --label: #7a8a9d;
+    --x: #4be0ff;
+    --y: #ffb347;
+    --z: #66d9a4;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
   body {
-    margin: 0;
-    background: var(--bg);
+    background: var(--bg-0);
     color: var(--fg);
-    font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
-    font-size: 13px;
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 12px;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* ─── Header ───────────────────────────────────────────────── */
   header {
-    padding: 14px 22px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--line-2);
+    background: linear-gradient(180deg, #060a12 0%, #04060a 100%);
+    padding: 10px 22px;
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 24px;
+    min-height: 48px;
   }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
-  header .mute { color: var(--mute); font-size: 12px; }
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 280px;
-    gap: 16px;
-    padding: 16px 22px;
+  header .brand {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: var(--amber);
   }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-  }
-  .panel h2 {
-    margin: 0 0 10px 0;
+  header .brand::before { content: "◆ "; color: var(--amber); }
+  header .meta {
+    display: flex;
+    gap: 22px;
+    color: var(--dim);
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--mute);
-    font-weight: 600;
+    letter-spacing: 0.1em;
   }
-  canvas {
-    width: 100%;
-    background: #07090d;
-    border-radius: 6px;
-    display: block;
-  }
-  .tracks { height: 460px; }
-  .mini   { height: 110px; margin-top: 12px; }
-
-  .big-num {
-    font-family: ui-monospace, Menlo, monospace;
-    font-size: 32px;
-    font-weight: 600;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
-  }
-  .label { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-
-  .meta {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px 0;
-  }
-  .meta .row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 4px 0;
-    border-bottom: 1px dashed var(--border);
-  }
-  .meta .row:last-child { border-bottom: none; }
-  .meta b {
+  header .meta b {
     color: var(--fg);
+    margin-left: 8px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+  header .clock {
+    margin-left: auto;
+    font-size: 20px;
+    color: var(--cyan);
     font-variant-numeric: tabular-nums;
-    font-family: ui-monospace, Menlo, monospace;
+    letter-spacing: 0.04em;
+  }
+  header .clock .z {
+    font-size: 11px;
+    color: var(--dim);
+    margin-left: 6px;
+    letter-spacing: 0.12em;
   }
 
-  .stat-big {
-    text-align: center;
-    padding: 8px 0 14px;
+  /* ─── Layout ───────────────────────────────────────────────── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    grid-template-rows: auto auto;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 10px 12px;
+    position: relative;
+  }
+  .panel h2 {
+    margin: 0 0 8px 0;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--label);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .panel h2 .dim { color: var(--dim-2); font-weight: 400; letter-spacing: 0.08em; }
+  .panel h2 .pill {
+    margin-left: auto;
+    font-size: 9px;
+    color: var(--dim);
+    border: 1px solid var(--line-2);
+    padding: 1px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
   }
 
-  .quake-list {
-    max-height: 180px;
-    overflow-y: auto;
+  .heli   { grid-column: 1 / span 2; grid-row: 1; }
+  .trace  { grid-column: 1;          grid-row: 2; }
+  .sidebar{ grid-column: 2;          grid-row: 2; display: flex; flex-direction: column; gap: 12px; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    background: var(--bg-0);
   }
-  .quake-list .item {
+  .heli canvas  { height: 260px; }
+  .trace canvas { height: 340px; }
+
+  /* ─── Readouts ─────────────────────────────────────────────── */
+  .readout { display: grid; grid-template-columns: 1fr; gap: 2px; }
+  .readout .row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .readout .row:last-child { border-bottom: none; }
+  .readout .label {
+    color: var(--label);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .readout .val { color: var(--fg); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .readout .val.big  { font-size: 22px; color: var(--amber); }
+  .readout .val.unit { color: var(--dim); font-size: 10px; margin-left: 4px; }
+  .readout .val.acc  { color: var(--cyan); }
+  .readout .val.warn { color: var(--red); }
+  .readout .sub { color: var(--dim); font-size: 10px; text-align: right; padding-bottom: 6px; }
+
+  /* ─── Event log ────────────────────────────────────────────── */
+  .events { max-height: 200px; overflow-y: auto; padding-right: 4px; }
+  .events::-webkit-scrollbar { width: 6px; }
+  .events::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
+  .events .item {
     display: flex;
     justify-content: space-between;
-    padding: 5px 0;
-    color: var(--danger);
+    padding: 4px 0;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
-    border-bottom: 1px dotted var(--border);
+    border-bottom: 1px dotted var(--line);
+    color: var(--red);
   }
-  .quake-list .item:last-child { border-bottom: none; }
-  .quake-list .empty { color: var(--mute); font-style: italic; padding: 6px 0; }
+  .events .item span.t { color: var(--dim); }
+  .events .empty {
+    color: var(--dim);
+    padding: 10px 0;
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* ─── Status indicator ─────────────────────────────────────── */
+  .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .dot.alert { background: var(--red); box-shadow: 0 0 10px var(--red); animation: pulse 0.8s infinite; }
+  .dot.off   { background: var(--dim-2); box-shadow: none; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
   button {
-    background: #161c26;
-    color: var(--fg);
-    border: 1px solid var(--border);
-    padding: 6px 12px;
-    border-radius: 6px;
+    background: transparent;
+    color: var(--dim);
+    border: 1px solid var(--line-2);
+    padding: 4px 10px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     cursor: pointer;
-    font-size: 12px;
   }
-  button:hover { background: #1e2530; }
+  button:hover { color: var(--amber); border-color: var(--amber); }
 
-  .legend { display: flex; gap: 16px; font-size: 11px; color: var(--mute); margin-top: 6px; }
-  .legend span::before { content: "■ "; }
-  .legend .lx { color: var(--x); }
-  .legend .ly { color: var(--y); }
-  .legend .lz { color: var(--z); }
-
-  .status-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--z);
-    margin-right: 6px;
-    box-shadow: 0 0 8px var(--z);
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    .heli, .trace, .sidebar { grid-column: 1; }
   }
-  .status-dot.alert { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>seismo</h1>
-  <span class="mute"><span class="status-dot" id="dot"></span><span id="status">connecting…</span></span>
-  <span class="mute" style="margin-left:auto">apple silicon MEMS IMU · ~100 Hz</span>
+  <div class="brand">SEISMO</div>
+  <div class="meta">
+    <span>STA <b id="m-host">—</b></span>
+    <span>UP <b id="m-uptime">00:00:00</b></span>
+    <span>SAMPLES <b id="m-samples">0</b></span>
+    <span><span class="dot" id="dot"></span><b id="m-status">connecting…</b></span>
+  </div>
+  <div class="clock">
+    <span id="m-clock">--:--:--</span><span class="z">UTC</span>
+  </div>
 </header>
 
-<div class="grid">
-  <div>
-    <div class="panel">
-      <h2>3-axis trace</h2>
-      <canvas id="tracks" class="tracks" width="2000" height="920"></canvas>
-      <div class="legend">
-        <span class="lx">X</span><span class="ly">Y</span><span class="lz">Z</span>
-        <span style="margin-left:auto; color:var(--mute)">scale: ±0.5g full · window: <span id="winsec">60</span>s</span>
+<main>
+  <section class="panel heli">
+    <h2>
+      HELICORDER
+      <span class="dim">10 rows × 60 s · last 10 minutes</span>
+      <span class="pill">|mag|</span>
+    </h2>
+    <canvas id="heli"></canvas>
+  </section>
+
+  <section class="panel trace">
+    <h2>
+      WAVEFORM
+      <span class="dim">3-axis · 60 s · high-pass 0.5 Hz</span>
+      <span class="pill">±0.5 g</span>
+    </h2>
+    <canvas id="trace"></canvas>
+  </section>
+
+  <aside class="sidebar">
+    <section class="panel">
+      <h2>PEAK GROUND ACCEL <span class="pill">since start</span></h2>
+      <div class="readout">
+        <div class="row" style="border-bottom:none; padding-bottom:0">
+          <span class="val big" id="r-pga">0.0000</span>
+          <span class="val unit">g</span>
+        </div>
+        <div class="sub"><span id="r-pga-gal">—</span> gal · <span id="r-pga-ms2">—</span> m/s²</div>
+        <div class="row">
+          <span class="label">RMS / 10 min</span>
+          <span class="val" id="r-rms">—</span>
+        </div>
+        <div class="row">
+          <span class="label">STA/LTA</span>
+          <span class="val acc" id="r-stalta">—</span>
+        </div>
+        <div class="row">
+          <span class="label">TRIGGER @</span>
+          <span class="val" id="r-trig">—</span>
+        </div>
+        <div class="row">
+          <span class="label">RATE</span>
+          <span class="val" id="r-rate">— Hz</span>
+        </div>
       </div>
-    </div>
+      <button style="margin-top:8px" onclick="resetPGA()">reset peak</button>
+    </section>
 
-    <div class="panel" style="margin-top:14px">
-      <h2>magnitude envelope</h2>
-      <canvas id="env" class="mini" width="2000" height="220"></canvas>
-    </div>
-  </div>
-
-  <div>
-    <div class="panel stat-big">
-      <div class="label">PGA (since start)</div>
-      <div class="big-num" id="pga">—</div>
-      <button onclick="resetPGA()" style="margin-top:6px">reset</button>
-    </div>
-
-    <div class="panel" style="margin-top:14px">
-      <h2>live stats</h2>
-      <div class="meta">
-        <div class="row"><span>RMS (1 min)</span><b id="rms">—</b></div>
-        <div class="row"><span>STA/LTA ratio</span><b id="stalta">—</b></div>
-        <div class="row"><span>trigger @</span><b id="trig">—</b></div>
-        <div class="row"><span>rate</span><b id="rate">—</b></div>
-        <div class="row"><span>buffer</span><b id="buf">—</b></div>
-      </div>
-    </div>
-
-    <div class="panel" style="margin-top:14px">
-      <h2>detected events</h2>
-      <div class="quake-list" id="quakes"><div class="empty">no events yet</div></div>
-    </div>
-  </div>
-</div>
+    <section class="panel" style="flex:1">
+      <h2>EVENT LOG <span class="pill"><span id="r-evcount">0</span></span></h2>
+      <div class="events" id="ev-list"><div class="empty">no events</div></div>
+    </section>
+  </aside>
+</main>
 
 <script>
-const canvasTracks = document.getElementById('tracks');
-const ctxTracks = canvasTracks.getContext('2d');
-const canvasEnv = document.getElementById('env');
-const ctxEnv = canvasEnv.getContext('2d');
+"use strict";
+
+// ─── Canvases ─────────────────────────────────────────────────
+const elHeli = document.getElementById('heli');
+const ctxHeli = elHeli.getContext('2d');
+const elTrace = document.getElementById('trace');
+const ctxTrace = elTrace.getContext('2d');
 
 function fit(c) {
   const r = c.getBoundingClientRect();
   c.width  = Math.floor(r.width  * devicePixelRatio);
   c.height = Math.floor(r.height * devicePixelRatio);
 }
-function fitAll() { fit(canvasTracks); fit(canvasEnv); }
+function fitAll() { fit(elHeli); fit(elTrace); }
 window.addEventListener('resize', fitAll);
 fitAll();
 
+// ─── State ────────────────────────────────────────────────────
 let latest = null;
 
-function drawGrid(ctx, W, H, rows) {
-  ctx.strokeStyle = '#12161e';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i = 1; i < rows; i++) {
-    const y = (H * i / rows) | 0;
-    ctx.moveTo(0, y); ctx.lineTo(W, y);
+// ─── Helpers ──────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtHMS(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+function fmtUTC(d) {
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+function fmtG(v, digits=4) { return (v >= 0 ? ' ' : '') + v.toFixed(digits); }
+
+// ─── Helicorder ──────────────────────────────────────────────
+function drawHelicorder(samples, snap) {
+  const W = elHeli.width, H = elHeli.height;
+  ctxHeli.clearRect(0, 0, W, H);
+  ctxHeli.fillStyle = '#04060a';
+  ctxHeli.fillRect(0, 0, W, H);
+  if (!samples || samples.length < 2) return;
+
+  const ROWS = 10;
+  const ROW_SEC = 60;
+  const TOTAL_SEC = ROWS * ROW_SEC;
+
+  const tEnd = samples[samples.length - 1].t;
+  const tStart = tEnd - TOTAL_SEC;
+  const rowH = H / ROWS;
+  const labelW = 70 * devicePixelRatio;
+  const plotW = W - labelW - (8 * devicePixelRatio);
+
+  // auto-scale
+  let peak = 0.01;
+  samples.forEach(s => { if (s.t >= tStart && s.m > peak) peak = s.m; });
+
+  // grid
+  ctxHeli.strokeStyle = 'rgba(30, 44, 62, 0.45)';
+  ctxHeli.lineWidth = 1;
+  ctxHeli.beginPath();
+  for (let i = 0; i <= ROWS; i++) {
+    const y = (i * rowH) | 0;
+    ctxHeli.moveTo(labelW, y + 0.5); ctxHeli.lineTo(W, y + 0.5);
   }
-  ctx.stroke();
-}
+  for (let i = 0; i <= 6; i++) {
+    const x = labelW + ((plotW * i / 6) | 0);
+    ctxHeli.moveTo(x + 0.5, 0); ctxHeli.lineTo(x + 0.5, H);
+  }
+  ctxHeli.stroke();
 
-function drawTrack(ctx, samples, color, yCenter, halfH, scale, accessor) {
-  if (samples.length < 2) return;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.2 * devicePixelRatio;
-  ctx.beginPath();
-  samples.forEach((s, i) => {
-    const x = (i / (samples.length - 1)) * ctx.canvas.width;
-    const y = yCenter - accessor(s) * scale;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  // time conversion (server "seconds since start" → wall clock)
+  const startUnix = (snap.stats && snap.stats.start_unix) || (Date.now() / 1000);
+  const tToWall = (t) => new Date((startUnix + t) * 1000);
 
-  ctx.strokeStyle = '#1e2530';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, yCenter); ctx.lineTo(ctx.canvas.width, yCenter);
-  ctx.stroke();
-}
+  for (let row = 0; row < ROWS; row++) {
+    const rowTStart = tStart + row * ROW_SEC;
+    const rowTEnd = rowTStart + ROW_SEC;
+    const yMid = row * rowH + rowH / 2;
 
-function drawTracks(snap) {
-  const W = canvasTracks.width, H = canvasTracks.height;
-  ctxTracks.clearRect(0, 0, W, H);
-  drawGrid(ctxTracks, W, H, 3);
+    // time label
+    const wall = tToWall(rowTStart);
+    const label = `${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`;
+    ctxHeli.fillStyle = '#5b6b7d';
+    ctxHeli.font = `${11 * devicePixelRatio}px ui-monospace, monospace`;
+    ctxHeli.textBaseline = 'middle';
+    ctxHeli.fillText(label, 8 * devicePixelRatio, yMid);
 
-  const samples = snap.samples || [];
-  const thirds = H / 3;
-  const halfH = thirds * 0.45;
-  const scale = halfH / 0.5; // ±0.5g
+    const rowPts = samples.filter(s => s.t >= rowTStart && s.t < rowTEnd);
+    if (rowPts.length < 2) continue;
 
-  drawTrack(ctxTracks, samples, '#58a6ff', thirds * 0.5, halfH, scale, s => s.hx);
-  drawTrack(ctxTracks, samples, '#ffa657', thirds * 1.5, halfH, scale, s => s.hy);
-  drawTrack(ctxTracks, samples, '#3fb950', thirds * 2.5, halfH, scale, s => s.hz);
+    // trace
+    ctxHeli.strokeStyle = '#ffb347';
+    ctxHeli.lineWidth = 1 * devicePixelRatio;
+    ctxHeli.beginPath();
+    rowPts.forEach((s, i) => {
+      const x = labelW + ((s.t - rowTStart) / ROW_SEC) * plotW;
+      const amp = (s.m / peak) * (rowH * 0.48);
+      const sign = i % 2 === 0 ? 1 : -1;
+      const y = yMid - sign * amp;
+      if (i === 0) ctxHeli.moveTo(x, y);
+      else ctxHeli.lineTo(x, y);
+    });
+    ctxHeli.stroke();
 
-  // axis labels
-  ctxTracks.fillStyle = '#6b7485';
-  ctxTracks.font = `${11 * devicePixelRatio}px ui-monospace`;
-  ctxTracks.fillText('X', 6 * devicePixelRatio, thirds * 0.5 + 4 * devicePixelRatio);
-  ctxTracks.fillText('Y', 6 * devicePixelRatio, thirds * 1.5 + 4 * devicePixelRatio);
-  ctxTracks.fillText('Z', 6 * devicePixelRatio, thirds * 2.5 + 4 * devicePixelRatio);
-}
-
-function drawEnvelope(snap) {
-  const W = canvasEnv.width, H = canvasEnv.height;
-  ctxEnv.clearRect(0, 0, W, H);
-  drawGrid(ctxEnv, W, H, 4);
-
-  const samples = snap.samples || [];
-  if (samples.length < 2) return;
-
-  // Find peak magnitude for autoscaling (minimum 0.1g)
-  let peak = 0.1;
-  samples.forEach(s => { if (s.m > peak) peak = s.m; });
-
-  ctxEnv.fillStyle = 'rgba(247, 120, 186, 0.15)';
-  ctxEnv.strokeStyle = '#f778ba';
-  ctxEnv.lineWidth = 1.5 * devicePixelRatio;
-  ctxEnv.beginPath();
-  ctxEnv.moveTo(0, H);
-  samples.forEach((s, i) => {
-    const x = (i / (samples.length - 1)) * W;
-    const y = H - (s.m / peak) * H * 0.95;
-    ctxEnv.lineTo(x, y);
-  });
-  ctxEnv.lineTo(W, H);
-  ctxEnv.closePath();
-  ctxEnv.fill();
-
-  ctxEnv.beginPath();
-  samples.forEach((s, i) => {
-    const x = (i / (samples.length - 1)) * W;
-    const y = H - (s.m / peak) * H * 0.95;
-    if (i === 0) ctxEnv.moveTo(x, y); else ctxEnv.lineTo(x, y);
-  });
-  ctxEnv.stroke();
-
-  // Quake markers
-  const quakes = snap.quakes || [];
-  if (samples.length > 0 && quakes.length > 0) {
-    const tStart = samples[0].t, tEnd = samples[samples.length - 1].t;
-    ctxEnv.strokeStyle = '#ff6d6d';
-    ctxEnv.lineWidth = 2 * devicePixelRatio;
+    // event markers on this row
+    const quakes = (snap.quakes) || [];
     quakes.forEach(q => {
-      if (q.t < tStart || q.t > tEnd) return;
-      const x = ((q.t - tStart) / (tEnd - tStart)) * W;
-      ctxEnv.beginPath();
-      ctxEnv.moveTo(x, 0); ctxEnv.lineTo(x, H);
-      ctxEnv.stroke();
+      if (q.t < rowTStart || q.t >= rowTEnd) return;
+      const x = labelW + ((q.t - rowTStart) / ROW_SEC) * plotW;
+      ctxHeli.strokeStyle = '#ff4f6a';
+      ctxHeli.lineWidth = 2 * devicePixelRatio;
+      ctxHeli.beginPath();
+      ctxHeli.moveTo(x, row * rowH + 2);
+      ctxHeli.lineTo(x, (row + 1) * rowH - 2);
+      ctxHeli.stroke();
     });
   }
 
-  // Peak scale label
-  ctxEnv.fillStyle = '#6b7485';
-  ctxEnv.font = `${10 * devicePixelRatio}px ui-monospace`;
-  ctxEnv.fillText(peak.toFixed(3) + 'g', 6 * devicePixelRatio, 14 * devicePixelRatio);
+  // scale label
+  ctxHeli.fillStyle = '#5b6b7d';
+  ctxHeli.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctxHeli.textBaseline = 'top';
+  ctxHeli.fillText(`peak ${peak.toFixed(3)}g`, W - (90 * devicePixelRatio), 6 * devicePixelRatio);
 }
 
-function renderStats(snap) {
+// ─── 3-axis waveform ─────────────────────────────────────────
+function drawGridLines(ctx, W, H, cols, rows) {
+  ctx.strokeStyle = 'rgba(30, 44, 62, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < cols; i++) {
+    const x = (W * i / cols) | 0;
+    ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H);
+  }
+  for (let i = 1; i < rows; i++) {
+    const y = (H * i / rows) | 0;
+    ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5);
+  }
+  ctx.stroke();
+}
+
+function drawTrace(samples) {
+  const W = elTrace.width, H = elTrace.height;
+  ctxTrace.clearRect(0, 0, W, H);
+  ctxTrace.fillStyle = '#04060a';
+  ctxTrace.fillRect(0, 0, W, H);
+  drawGridLines(ctxTrace, W, H, 6, 6);
+
+  if (!samples || samples.length < 2) return;
+
+  const tEnd = samples[samples.length - 1].t;
+  const win = samples.filter(s => s.t >= tEnd - 60);
+  if (win.length < 2) return;
+
+  const tracks = [
+    { key: 'hx', color: '#4be0ff', label: 'X' },
+    { key: 'hy', color: '#ffb347', label: 'Y' },
+    { key: 'hz', color: '#66d9a4', label: 'Z' },
+  ];
+  const rowH = H / 3;
+  const scale = (rowH * 0.45) / 0.5;
+
+  tracks.forEach((tr, i) => {
+    const yMid = i * rowH + rowH / 2;
+
+    ctxTrace.strokeStyle = 'rgba(30, 44, 62, 0.9)';
+    ctxTrace.lineWidth = 1;
+    ctxTrace.beginPath();
+    ctxTrace.moveTo(0, yMid); ctxTrace.lineTo(W, yMid);
+    ctxTrace.stroke();
+
+    ctxTrace.strokeStyle = tr.color;
+    ctxTrace.lineWidth = 1.2 * devicePixelRatio;
+    ctxTrace.beginPath();
+    win.forEach((s, k) => {
+      const x = (k / (win.length - 1)) * W;
+      const y = yMid - s[tr.key] * scale;
+      if (k === 0) ctxTrace.moveTo(x, y);
+      else ctxTrace.lineTo(x, y);
+    });
+    ctxTrace.stroke();
+
+    ctxTrace.fillStyle = tr.color;
+    ctxTrace.font = `bold ${12 * devicePixelRatio}px ui-monospace`;
+    ctxTrace.textBaseline = 'top';
+    ctxTrace.fillText(tr.label, 8 * devicePixelRatio, i * rowH + 6 * devicePixelRatio);
+  });
+
+  // time axis labels
+  ctxTrace.fillStyle = '#5b6b7d';
+  ctxTrace.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctxTrace.textBaseline = 'bottom';
+  for (let s = 0; s <= 60; s += 10) {
+    const x = W - (s / 60) * W;
+    ctxTrace.fillText(`-${s}s`, x + 4 * devicePixelRatio, H - 4 * devicePixelRatio);
+  }
+}
+
+// ─── Readouts ─────────────────────────────────────────────────
+function updateReadouts(snap) {
   const s = snap.stats || {};
-  document.getElementById('pga').textContent = (s.pga || 0).toFixed(4) + 'g';
-  document.getElementById('rms').textContent = (s.rms || 0).toFixed(5) + 'g';
-  document.getElementById('stalta').textContent = (s.sta_lta || 0).toFixed(2);
-  document.getElementById('trig').textContent = (s.trigger || 0).toFixed(1) + '×';
-  document.getElementById('rate').textContent = (s.rate_hz || 0) + ' Hz';
-  document.getElementById('buf').textContent = `${s.filled || 0}/${(s.window_s || 0) * (s.rate_hz || 100)}`;
-  document.getElementById('winsec').textContent = s.window_s || 60;
+  document.getElementById('r-pga').textContent     = fmtG(s.pga || 0, 4);
+  document.getElementById('r-pga-gal').textContent = (s.pga_gal || 0).toFixed(3);
+  document.getElementById('r-pga-ms2').textContent = (s.pga_ms2 || 0).toFixed(4);
+  document.getElementById('r-rms').textContent     = fmtG(s.rms || 0, 5) + ' g';
+  const ratio = s.sta_lta || 0;
+  const trig  = s.trigger || 4;
+  const rEl = document.getElementById('r-stalta');
+  rEl.textContent = ratio.toFixed(2);
+  rEl.classList.toggle('warn', ratio > trig);
+  document.getElementById('r-trig').textContent = trig.toFixed(1) + '×';
+  document.getElementById('r-rate').textContent = (s.rate_hz || 0) + ' Hz';
+
+  document.getElementById('m-host').textContent = s.host || 'local';
+  document.getElementById('m-uptime').textContent = fmtHMS(s.uptime_s || 0);
+  document.getElementById('m-samples').textContent =
+    (s.filled || 0).toLocaleString();
 
   const dot = document.getElementById('dot');
-  if ((s.sta_lta || 0) > (s.trigger || 4)) dot.classList.add('alert');
-  else dot.classList.remove('alert');
+  const statusEl = document.getElementById('m-status');
+  if (ratio > trig) {
+    dot.className = 'dot alert';
+    statusEl.textContent = 'EVENT';
+  } else {
+    dot.className = 'dot';
+    statusEl.textContent = 'LIVE';
+  }
 }
 
-function renderQuakes(snap) {
-  const list = document.getElementById('quakes');
-  const qs = (snap.quakes || []).slice().reverse();
-  if (qs.length === 0) {
-    list.innerHTML = '<div class="empty">no events yet</div>';
+function renderEvents(snap) {
+  const list = document.getElementById('ev-list');
+  const evs = (snap.quakes || []).slice().reverse();
+  document.getElementById('r-evcount').textContent = (snap.quakes || []).length;
+  if (evs.length === 0) {
+    list.innerHTML = '<div class="empty">no events</div>';
     return;
   }
-  list.innerHTML = qs.map(q => `
-    <div class="item">
-      <span>t+${q.t.toFixed(1)}s</span>
+  const s = snap.stats || {};
+  const startUnix = s.start_unix || (Date.now() / 1000);
+  list.innerHTML = evs.map(q => {
+    const wall = new Date((startUnix + q.t) * 1000);
+    const hms = fmtUTC(wall);
+    return `<div class="item">
+      <span class="t">${hms}</span>
       <span>${q.peak.toFixed(3)}g · ${q.ratio.toFixed(1)}×</span>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-function draw() {
+// ─── Main render loop ────────────────────────────────────────
+function render() {
   if (latest) {
-    drawTracks(latest);
-    drawEnvelope(latest);
-    renderStats(latest);
-    renderQuakes(latest);
+    drawHelicorder(latest.samples || [], latest);
+    drawTrace(latest.samples || []);
+    updateReadouts(latest);
+    renderEvents(latest);
   }
-  requestAnimationFrame(draw);
+  document.getElementById('m-clock').textContent = fmtUTC(new Date());
+  requestAnimationFrame(render);
 }
-requestAnimationFrame(draw);
+requestAnimationFrame(render);
 
-const es = new EventSource('/stream');
-es.onopen = () => document.getElementById('status').textContent = 'streaming';
-es.onerror = () => document.getElementById('status').textContent = 'disconnected';
-es.onmessage = (e) => {
-  try { latest = JSON.parse(e.data); } catch {}
-};
+// ─── Stream ──────────────────────────────────────────────────
+// /stream already decimates, but we want the full 10-minute window, so we
+// also poll /state?decim=60 which gives us 1000 points (enough for helicorder).
+setInterval(async () => {
+  try {
+    const r = await fetch('/state?decim=60');
+    if (r.ok) latest = await r.json();
+  } catch {}
+}, 500);
 
 async function resetPGA() {
-  await fetch('/reset', {method:'POST'}).catch(()=>{});
+  try { await fetch('/reset', { method: 'POST' }); } catch {}
 }
 </script>
 </body>
