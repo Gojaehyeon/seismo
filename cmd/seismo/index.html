@@ -656,7 +656,7 @@ function dominantAxis(rowPts) {
 
 function boostedCenteredWave(v, ref) {
   const n = Math.max(-1, Math.min(1, v / ref));
-  return Math.sign(n) * Math.pow(Math.abs(n), 0.72);
+  return Math.sign(n) * Math.pow(Math.abs(n), 0.58);
 }
 
 function recentLiveMagnitude(recent) {
@@ -694,9 +694,13 @@ function drawHelicorder(samples, snap) {
   if (win.length < 2) return;
 
   const axis = dominantAxis(win);
+  let mean = 0;
+  for (const s of win) mean += s[axis.key];
+  mean /= win.length;
+
   let peakAbs = 0.0025;
-  for (const s of win) peakAbs = Math.max(peakAbs, Math.abs(s[axis.key]));
-  const ref = Math.max(0.00035, peakAbs * 0.085);
+  for (const s of win) peakAbs = Math.max(peakAbs, Math.abs(s[axis.key] - mean));
+  const ref = Math.max(0.00012, peakAbs * 0.032);
 
   // Grid
   ctx.strokeStyle = 'rgba(36, 52, 73, 0.55)';
@@ -730,7 +734,8 @@ function drawHelicorder(samples, snap) {
   ctx.beginPath();
   win.forEach((s, i) => {
     const x = plotX + ((s.t - tStart) / TOTAL) * plotW;
-    const amp = boostedCenteredWave(s[axis.key], ref) * (plotH * 0.49);
+    const centered = s[axis.key] - mean;
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.54);
     const y = yMid - amp;
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
@@ -771,7 +776,7 @@ function drawHelicorder(samples, snap) {
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.fillText(`FLOW · ${axis.label}-AXIS · 4X GAIN · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
+  ctx.fillText(`FLOW · ${axis.label}-AXIS · CENTERED · 8X GAIN · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
   ctx.textAlign = 'right';
   ctx.fillText(`WINDOW 10 MIN`, W - padR, 4 * devicePixelRatio);
 }
