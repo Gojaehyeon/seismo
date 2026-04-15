@@ -129,31 +129,6 @@
   }
   .clock .z { font-size: 10px; color: var(--dim); margin-left: 8px; letter-spacing: 0.18em; }
 
-  /* ── Warning banner (shown on event) ────────────────────── */
-  .alert-banner {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    display: none;
-    padding: 10px 22px;
-    background:
-      repeating-linear-gradient(-45deg,
-        #1a0608 0px, #1a0608 12px,
-        #ff3040 12px, #ff3040 24px);
-    color: #fff;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    text-shadow: 0 0 12px #ff3040;
-    animation: alertBlink 0.6s steps(2) infinite;
-    border-top: 1px solid #ff3040;
-    border-bottom: 1px solid #ff3040;
-  }
-  .alert-banner.on { display: block; }
-  @keyframes alertBlink { 50% { filter: brightness(1.5); } }
-
   /* ── Grid ───────────────────────────────────────────────── */
   main {
     display: grid;
@@ -421,10 +396,6 @@
     <span id="m-clock">--:--:--</span><span class="z">UTC</span>
   </div>
 </header>
-
-<div class="alert-banner" id="alert">
-  ◢◤ SEISMIC EVENT DETECTED · STA/LTA THRESHOLD EXCEEDED ◥◣
-</div>
 
 <main>
   <section class="panel heli">
@@ -992,8 +963,8 @@ function drawGauge(pga) {
   const cX = W / 2, cY = H * 0.82;
   const R = Math.min(W * 0.42, H * 0.78);
 
-  // Smooth needle (lag 0.2)
-  gaugeDisplay += (pga - gaugeDisplay) * 0.2;
+  // Smooth needle (snappier response)
+  gaugeDisplay += (pga - gaugeDisplay) * 0.35;
 
   const MAX_G = 0.5;
   const frac = Math.min(1, Math.max(0, gaugeDisplay / MAX_G));
@@ -1135,15 +1106,12 @@ function updateReadouts(snap) {
 
   const dot = document.getElementById('dot');
   const statusEl = document.getElementById('m-status');
-  const alertEl = document.getElementById('alert');
   if (ratio > trig) {
     dot.className = 'dot alert';
     statusEl.textContent = 'EVENT';
-    alertEl.classList.add('on');
   } else {
     dot.className = 'dot';
     statusEl.textContent = 'LIVE';
-    alertEl.classList.remove('on');
   }
 
   updateMMI(s.pga || 0);
@@ -1168,17 +1136,6 @@ function renderEvents(snap) {
   }).join('');
 }
 
-// ─── Tremor (HUD shake based on live sensor) ────────────────
-function applyTremor(recent) {
-  if (!recent || recent.length === 0) return;
-  const last = recent[recent.length - 1];
-  // 0.01g → 12px. Clamp so huge spikes don't break layout.
-  const K = 1200;
-  const tx = Math.max(-18, Math.min(18, last.hx * K));
-  const ty = Math.max(-18, Math.min(18, -last.hy * K));
-  document.getElementById('hud').style.transform = `translate(${tx}px, ${ty}px)`;
-}
-
 // ─── Main render loop ───────────────────────────────────────
 function render() {
   if (latest) {
@@ -1189,7 +1146,6 @@ function render() {
     drawGauge((latest.stats || {}).pga || 0);
     updateReadouts(latest);
     renderEvents(latest);
-    applyTremor(latest.recent || []);
   }
   document.getElementById('m-clock').textContent = fmtUTC(new Date());
   requestAnimationFrame(render);
@@ -1207,7 +1163,7 @@ async function poll() {
     }
   } catch {}
 }
-setInterval(poll, 250); // 4 Hz
+setInterval(poll, 80); // ~12 Hz — fast-moving waterfall + traces
 poll();
 
 async function resetPGA() {
