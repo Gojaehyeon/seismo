@@ -656,7 +656,7 @@ function dominantAxis(rowPts) {
 
 function boostedCenteredWave(v, ref) {
   const n = Math.max(-1, Math.min(1, v / ref));
-  return Math.sign(n) * Math.pow(Math.abs(n), 0.64);
+  return Math.sign(n) * Math.pow(Math.abs(n), 0.82);
 }
 
 function recentLiveMagnitude(recent) {
@@ -700,8 +700,14 @@ function drawHelicorder(samples, snap) {
   mean /= win.length;
 
   let peakAbs = 0.0025;
-  for (const s of win) peakAbs = Math.max(peakAbs, Math.abs(s[axis.key] - mean));
-  const ref = Math.max(0.00028, peakAbs * 0.07);
+  let avgAbs = 0;
+  for (const s of win) {
+    const centered = Math.abs(s[axis.key] - mean);
+    peakAbs = Math.max(peakAbs, centered);
+    avgAbs += centered;
+  }
+  avgAbs /= win.length;
+  const ref = Math.max(0.00022, avgAbs * 5.5);
 
   // Grid
   ctx.strokeStyle = 'rgba(36, 52, 73, 0.55)';
@@ -736,7 +742,7 @@ function drawHelicorder(samples, snap) {
   win.forEach((s, i) => {
     const x = plotX + ((s.t - tStart) / TOTAL) * plotW;
     const centered = s[axis.key] - mean;
-    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.15);
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.18);
     const y = yMid - amp;
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
@@ -758,7 +764,7 @@ function drawHelicorder(samples, snap) {
       }
     }
     const centered = nearest[axis.key] - mean;
-    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.05);
+    const amp = boostedCenteredWave(centered, ref) * (plotH * 0.06);
     const y = yMid - amp;
     ctx.strokeStyle = '#ff3040';
     ctx.lineWidth = 2.2 * devicePixelRatio;
@@ -793,7 +799,7 @@ function drawHelicorder(samples, snap) {
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.fillText(`FLOW · ${axis.label}-AXIS · CENTERED · 1.5X GAIN · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
+  ctx.fillText(`FLOW · ${axis.label}-AXIS · CENTERED · BASELINE SCALED · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
   ctx.textAlign = 'right';
   ctx.fillText(`WINDOW 3 MIN`, W - padR, 4 * devicePixelRatio);
 }
