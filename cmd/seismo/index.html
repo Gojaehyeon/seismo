@@ -690,6 +690,7 @@ function drawHelicorder(samples, snap) {
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const yMid = plotY + plotH / 2;
+  const X_TICKS = 4;
   const win = samples.filter(s => s.t >= tStart);
   if (win.length < 2) return;
 
@@ -711,8 +712,8 @@ function drawHelicorder(samples, snap) {
     ctx.moveTo(plotX, y + 0.5);
     ctx.lineTo(plotX + plotW, y + 0.5);
   }
-  for (let i = 0; i <= 6; i++) {
-    const x = plotX + ((plotW * i) / 6 | 0);
+  for (let i = 0; i <= X_TICKS; i++) {
+    const x = plotX + ((plotW * i) / X_TICKS | 0);
     ctx.moveTo(x + 0.5, plotY);
     ctx.lineTo(x + 0.5, plotY + plotH);
   }
@@ -764,10 +765,10 @@ function drawHelicorder(samples, snap) {
   ctx.font = `${10 * devicePixelRatio}px ui-monospace, monospace`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'center';
-  for (let i = 0; i <= 6; i++) {
-    const t = tStart + (TOTAL * i / 6);
+  for (let i = 0; i <= X_TICKS; i++) {
+    const t = tStart + (TOTAL * i / X_TICKS);
     const wall = new Date((startUnix + t) * 1000);
-    const x = plotX + (plotW * i / 6);
+    const x = plotX + (plotW * i / X_TICKS);
     ctx.fillText(`${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`, x, plotY + plotH + 6 * devicePixelRatio);
   }
 
