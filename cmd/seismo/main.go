@@ -198,6 +198,18 @@ func (b *Bus) snapshot(decim int) map[string]any {
 		b.rms = math.Sqrt(rmsSum / float64(b.filled))
 	}
 
+	// Full-rate buffer of the last ~2.56s (256 samples at 100Hz) for the
+	// frontend FFT spectrogram and particle-motion plot.
+	recentN := 256
+	if b.filled < recentN {
+		recentN = b.filled
+	}
+	recent := make([]Reading, recentN)
+	for i := 0; i < recentN; i++ {
+		idx := (b.head - recentN + i + b.windowCap) % b.windowCap
+		recent[i] = b.window[idx]
+	}
+
 	quakes := make([]Quake, 0, b.quakesLen)
 	for i := range b.quakesLen {
 		idx := (b.quakesHead - b.quakesLen + i + b.quakesCap) % b.quakesCap
@@ -214,6 +226,7 @@ func (b *Bus) snapshot(decim int) map[string]any {
 
 	return map[string]any{
 		"samples": out,
+		"recent":  recent,
 		"quakes":  quakes,
 		"stats": map[string]any{
 			"pga":        b.pga,

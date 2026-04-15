@@ -2,134 +2,239 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SEISMO · live MacBook seismograph</title>
+<title>SEISMO · LIVE</title>
 <style>
   :root {
-    --bg-0: #04060a;
-    --bg-1: #080c14;
-    --bg-2: #0d131e;
-    --line: #14202e;
-    --line-2: #1e2c3e;
-    --fg: #d8e0ea;
-    --dim: #5b6b7d;
-    --dim-2: #3a4858;
-    --amber: #ffb347;
+    --bg-0: #02050a;
+    --bg-1: #070c16;
+    --bg-2: #0c1422;
+    --line: #19263a;
+    --line-2: #243449;
+    --fg: #e6ecf5;
+    --dim: #5a6a82;
+    --dim-2: #37465b;
+    --label: #8096b0;
+    --amber: #ffb21c;
+    --amber-hot: #ffd66d;
     --cyan: #4be0ff;
-    --green: #66d9a4;
-    --red: #ff4f6a;
-    --label: #7a8a9d;
+    --cyan-hot: #b6f1ff;
+    --green: #3dff85;
+    --red: #ff3040;
+    --red-hot: #ff8090;
     --x: #4be0ff;
-    --y: #ffb347;
-    --z: #66d9a4;
+    --y: #ffb21c;
+    --z: #3dff85;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
   body {
-    background: var(--bg-0);
+    background: radial-gradient(ellipse at top, #080f1c 0%, #02050a 70%) var(--bg-0);
     color: var(--fg);
     font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
     font-size: 12px;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.02em;
     -webkit-font-smoothing: antialiased;
+    user-select: none;
   }
 
-  /* ─── Header ───────────────────────────────────────────────── */
+  /* ── Scanlines overlay ──────────────────────────────────── */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 9999;
+    mix-blend-mode: overlay;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.65) 100%);
+    z-index: 9998;
+  }
+
+  /* ── Tremor container ───────────────────────────────────── */
+  .hud {
+    min-height: 100vh;
+    will-change: transform;
+  }
+
+  /* ── Header bar ─────────────────────────────────────────── */
   header {
+    position: relative;
     border-bottom: 1px solid var(--line-2);
-    background: linear-gradient(180deg, #060a12 0%, #04060a 100%);
-    padding: 10px 22px;
+    background: linear-gradient(180deg, #0a1322 0%, #04080f 100%);
+    padding: 8px 22px;
     display: flex;
     align-items: center;
-    gap: 24px;
-    min-height: 48px;
-  }
-  header .brand {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 0.22em;
-    color: var(--amber);
-  }
-  header .brand::before { content: "◆ "; color: var(--amber); }
-  header .meta {
-    display: flex;
     gap: 22px;
-    color: var(--dim);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+    min-height: 46px;
+    box-shadow: 0 0 30px rgba(255, 178, 28, 0.05) inset,
+                0 1px 0 rgba(255, 178, 28, 0.12) inset;
   }
-  header .meta b {
+  header::before, header::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      var(--amber) 20%,
+      var(--amber) 80%,
+      transparent 100%);
+    opacity: 0.55;
+  }
+  header::before { top: -1px; }
+  header::after  { bottom: -1px; }
+  .brand {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.32em;
+    color: var(--amber);
+    text-shadow: 0 0 12px rgba(255, 178, 28, 0.55);
+  }
+  .brand .bracket { color: var(--dim-2); font-weight: 400; }
+  .brand .ver { font-size: 9px; color: var(--dim); letter-spacing: 0.2em; margin-left: 8px; }
+  .meta {
+    display: flex;
+    gap: 20px;
+    color: var(--dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+  .meta b {
     color: var(--fg);
     margin-left: 8px;
     font-weight: 500;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
     text-transform: none;
   }
-  header .clock {
+  .clock {
     margin-left: auto;
-    font-size: 20px;
+    font-size: 22px;
     color: var(--cyan);
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 14px rgba(75, 224, 255, 0.4);
   }
-  header .clock .z {
-    font-size: 11px;
-    color: var(--dim);
-    margin-left: 6px;
-    letter-spacing: 0.12em;
-  }
+  .clock .z { font-size: 10px; color: var(--dim); margin-left: 8px; letter-spacing: 0.18em; }
 
-  /* ─── Layout ───────────────────────────────────────────────── */
+  /* ── Warning banner (shown on event) ────────────────────── */
+  .alert-banner {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    display: none;
+    padding: 10px 22px;
+    background:
+      repeating-linear-gradient(-45deg,
+        #1a0608 0px, #1a0608 12px,
+        #ff3040 12px, #ff3040 24px);
+    color: #fff;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    text-shadow: 0 0 12px #ff3040;
+    animation: alertBlink 0.6s steps(2) infinite;
+    border-top: 1px solid #ff3040;
+    border-bottom: 1px solid #ff3040;
+  }
+  .alert-banner.on { display: block; }
+  @keyframes alertBlink { 50% { filter: brightness(1.5); } }
+
+  /* ── Grid ───────────────────────────────────────────────── */
   main {
     display: grid;
-    grid-template-columns: 1fr 300px;
-    grid-template-rows: auto auto;
+    grid-template-columns: 1.6fr 1fr 300px;
+    grid-template-rows: 240px 1fr auto;
     gap: 12px;
     padding: 12px 14px;
   }
   .panel {
-    background: var(--bg-1);
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    padding: 10px 12px;
     position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 178, 28, 0.015) 0%, transparent 40%),
+      var(--bg-1);
+    border: 1px solid var(--line-2);
+    padding: 14px 14px 12px;
+    clip-path: polygon(
+      0 8px, 8px 0,
+      calc(100% - 8px) 0, 100% 8px,
+      100% calc(100% - 8px), calc(100% - 8px) 100%,
+      8px 100%, 0 calc(100% - 8px)
+    );
+    box-shadow: 0 0 22px rgba(255, 178, 28, 0.025) inset;
   }
+  .panel.glow-amber { box-shadow: 0 0 22px rgba(255, 178, 28, 0.04) inset, 0 0 18px rgba(255,178,28,0.08); }
+  .panel.glow-cyan  { box-shadow: 0 0 22px rgba(75, 224, 255, 0.05) inset, 0 0 18px rgba(75,224,255,0.08); }
   .panel h2 {
     margin: 0 0 8px 0;
     font-size: 10px;
-    font-weight: 600;
-    color: var(--label);
+    font-weight: 700;
+    color: var(--amber);
     text-transform: uppercase;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.18em;
     display: flex;
     align-items: baseline;
     gap: 10px;
+    text-shadow: 0 0 8px rgba(255, 178, 28, 0.3);
   }
-  .panel h2 .dim { color: var(--dim-2); font-weight: 400; letter-spacing: 0.08em; }
+  .panel h2 .sub { color: var(--dim-2); font-weight: 400; letter-spacing: 0.1em; }
   .panel h2 .pill {
     margin-left: auto;
     font-size: 9px;
     color: var(--dim);
     border: 1px solid var(--line-2);
-    padding: 1px 6px;
-    border-radius: 2px;
-    letter-spacing: 0.1em;
+    padding: 2px 6px;
+    letter-spacing: 0.12em;
+    background: #050a12;
   }
+  /* Corner brackets (absolute) */
+  .panel .bracket {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+  .panel .bracket.tl { top: 2px;    left: 2px;    border-top: 2px solid var(--amber);   border-left:  2px solid var(--amber); }
+  .panel .bracket.tr { top: 2px;    right: 2px;   border-top: 2px solid var(--amber);   border-right: 2px solid var(--amber); }
+  .panel .bracket.bl { bottom: 2px; left: 2px;    border-bottom: 2px solid var(--amber); border-left:  2px solid var(--amber); }
+  .panel .bracket.br { bottom: 2px; right: 2px;   border-bottom: 2px solid var(--amber); border-right: 2px solid var(--amber); }
 
-  .heli   { grid-column: 1 / span 2; grid-row: 1; }
+  .heli   { grid-column: 1 / span 3; grid-row: 1; }
   .trace  { grid-column: 1;          grid-row: 2; }
-  .sidebar{ grid-column: 2;          grid-row: 2; display: flex; flex-direction: column; gap: 12px; }
+  .spec   { grid-column: 2;          grid-row: 2; }
+  .side   { grid-column: 3;          grid-row: 2 / span 2; display: flex; flex-direction: column; gap: 12px; }
+  .gauge  { grid-column: 1;          grid-row: 3; }
+  .parti  { grid-column: 2;          grid-row: 3; }
 
   canvas {
     display: block;
     width: 100%;
-    background: var(--bg-0);
+    background: #02040a;
+    image-rendering: pixelated;
   }
-  .heli canvas  { height: 260px; }
-  .trace canvas { height: 340px; }
+  .heli  canvas { height: 200px; }
+  .trace canvas { height: 280px; }
+  .spec  canvas { height: 280px; }
+  .gauge canvas { height: 220px; }
+  .parti canvas { height: 220px; }
 
-  /* ─── Readouts ─────────────────────────────────────────────── */
-  .readout { display: grid; grid-template-columns: 1fr; gap: 2px; }
+  /* ── Readout ────────────────────────────────────────────── */
+  .readout { display: grid; gap: 2px; }
   .readout .row {
     display: flex;
     align-items: baseline;
@@ -145,16 +250,68 @@
     letter-spacing: 0.12em;
   }
   .readout .val { color: var(--fg); font-size: 13px; font-variant-numeric: tabular-nums; }
-  .readout .val.big  { font-size: 22px; color: var(--amber); }
+  .readout .val.big {
+    font-size: 26px;
+    color: var(--amber);
+    text-shadow: 0 0 14px rgba(255, 178, 28, 0.45);
+  }
   .readout .val.unit { color: var(--dim); font-size: 10px; margin-left: 4px; }
   .readout .val.acc  { color: var(--cyan); }
-  .readout .val.warn { color: var(--red); }
+  .readout .val.warn { color: var(--red); text-shadow: 0 0 10px var(--red); }
   .readout .sub { color: var(--dim); font-size: 10px; text-align: right; padding-bottom: 6px; }
 
-  /* ─── Event log ────────────────────────────────────────────── */
-  .events { max-height: 200px; overflow-y: auto; padding-right: 4px; }
+  /* ── MMI Bar ───────────────────────────────────────────── */
+  .mmi-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0 2px;
+  }
+  .mmi-bar {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 2px;
+  }
+  .mmi-bar .cell {
+    height: 14px;
+    background: #0b1220;
+    border: 1px solid var(--line);
+    position: relative;
+  }
+  .mmi-bar .cell.on {
+    background: linear-gradient(180deg, #162235 0%, #0b1220 100%);
+  }
+  .mmi-bar .cell[data-level="0"].on,
+  .mmi-bar .cell[data-level="1"].on { background: #3dff85; box-shadow: 0 0 8px #3dff85; }
+  .mmi-bar .cell[data-level="2"].on,
+  .mmi-bar .cell[data-level="3"].on { background: #ffb21c; box-shadow: 0 0 8px #ffb21c; }
+  .mmi-bar .cell[data-level="4"].on,
+  .mmi-bar .cell[data-level="5"].on { background: #ff9030; box-shadow: 0 0 8px #ff9030; }
+  .mmi-bar .cell[data-level="6"].on,
+  .mmi-bar .cell[data-level="7"].on,
+  .mmi-bar .cell[data-level="8"].on { background: #ff3040; box-shadow: 0 0 10px #ff3040; }
+  .mmi-labels {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 2px;
+    font-size: 9px;
+    color: var(--dim);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .mmi-desc {
+    color: var(--amber);
+    font-size: 11px;
+    text-align: center;
+    letter-spacing: 0.15em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* ── Event log ──────────────────────────────────────────── */
+  .events { max-height: 220px; overflow-y: auto; padding-right: 4px; }
   .events::-webkit-scrollbar { width: 6px; }
-  .events::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
+  .events::-webkit-scrollbar-thumb { background: var(--line-2); }
   .events .item {
     display: flex;
     justify-content: space-between;
@@ -164,93 +321,180 @@
     border-bottom: 1px dotted var(--line);
     color: var(--red);
   }
-  .events .item span.t { color: var(--dim); }
-  .events .empty {
-    color: var(--dim);
-    padding: 10px 0;
-    text-align: center;
-    font-style: italic;
-  }
+  .events .item .t { color: var(--dim); }
+  .events .empty { color: var(--dim); padding: 12px 0; text-align: center; font-style: italic; }
 
-  /* ─── Status indicator ─────────────────────────────────────── */
+  /* ── Status dot ─────────────────────────────────────────── */
   .dot {
     display: inline-block;
-    width: 7px; height: 7px;
+    width: 8px; height: 8px;
     border-radius: 50%;
     background: var(--green);
-    box-shadow: 0 0 8px var(--green);
+    box-shadow: 0 0 10px var(--green);
     margin-right: 6px;
     vertical-align: middle;
   }
-  .dot.alert { background: var(--red); box-shadow: 0 0 10px var(--red); animation: pulse 0.8s infinite; }
-  .dot.off   { background: var(--dim-2); box-shadow: none; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .dot.alert { background: var(--red); box-shadow: 0 0 14px var(--red); animation: pulse 0.6s infinite; }
+  .dot.off { background: var(--dim-2); box-shadow: none; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
+  /* ── Button ─────────────────────────────────────────────── */
   button {
     background: transparent;
     color: var(--dim);
     border: 1px solid var(--line-2);
-    padding: 4px 10px;
-    border-radius: 2px;
+    padding: 5px 12px;
     font-family: inherit;
     font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     cursor: pointer;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   }
-  button:hover { color: var(--amber); border-color: var(--amber); }
+  button:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+    box-shadow: 0 0 10px rgba(255, 178, 28, 0.3);
+  }
 
-  @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; }
-    .heli, .trace, .sidebar { grid-column: 1; }
+  /* ── Footer ticker ──────────────────────────────────────── */
+  footer {
+    position: relative;
+    padding: 7px 22px;
+    border-top: 1px solid var(--line-2);
+    background: #040810;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  footer::before {
+    content: "";
+    position: absolute;
+    top: -1px; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      var(--amber) 40%,
+      var(--amber) 60%,
+      transparent 100%);
+    opacity: 0.55;
+  }
+  .ticker {
+    display: inline-block;
+    animation: tickerScroll 60s linear infinite;
+  }
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .ticker span { color: var(--dim); }
+  .ticker b { color: var(--amber); font-weight: 500; margin-right: 22px; }
+
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; grid-template-rows: repeat(6, auto); }
+    .heli, .trace, .spec, .side, .gauge, .parti { grid-column: 1; }
+    .heli  { grid-row: 1; }
+    .trace { grid-row: 2; }
+    .spec  { grid-row: 3; }
+    .parti { grid-row: 4; }
+    .gauge { grid-row: 5; }
+    .side  { grid-row: 6; }
   }
 </style>
 </head>
 <body>
 
+<div class="hud" id="hud">
+
 <header>
-  <div class="brand">SEISMO</div>
+  <div class="brand">[ SEISMO ]<span class="ver">v0.2 · BMI286</span></div>
   <div class="meta">
     <span>STA <b id="m-host">—</b></span>
     <span>UP <b id="m-uptime">00:00:00</b></span>
-    <span>SAMPLES <b id="m-samples">0</b></span>
-    <span><span class="dot" id="dot"></span><b id="m-status">connecting…</b></span>
+    <span>SMP <b id="m-samples">0</b></span>
+    <span><span class="dot" id="dot"></span><b id="m-status">INIT</b></span>
   </div>
   <div class="clock">
     <span id="m-clock">--:--:--</span><span class="z">UTC</span>
   </div>
 </header>
 
+<div class="alert-banner" id="alert">
+  ◢◤ SEISMIC EVENT DETECTED · STA/LTA THRESHOLD EXCEEDED ◥◣
+</div>
+
 <main>
   <section class="panel heli">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
     <h2>
       HELICORDER
-      <span class="dim">10 rows × 60 s · last 10 minutes</span>
-      <span class="pill">|mag|</span>
+      <span class="sub">10 ROWS × 60 S · LAST 10 MIN</span>
+      <span class="pill">|MAG|</span>
     </h2>
     <canvas id="heli"></canvas>
   </section>
 
   <section class="panel trace">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
     <h2>
       WAVEFORM
-      <span class="dim">3-axis · 60 s · high-pass 0.5 Hz</span>
-      <span class="pill">±0.5 g</span>
+      <span class="sub">3-AXIS · 60 S · HP 0.5 HZ</span>
+      <span class="pill">±0.5 G</span>
     </h2>
     <canvas id="trace"></canvas>
   </section>
 
-  <aside class="sidebar">
+  <section class="panel spec glow-cyan">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
+    <h2>
+      SPECTROGRAM
+      <span class="sub">FFT · 0–25 HZ · WATERFALL</span>
+      <span class="pill">256 PT</span>
+    </h2>
+    <canvas id="spec"></canvas>
+  </section>
+
+  <section class="panel gauge glow-amber">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
+    <h2>
+      PEAK GROUND ACCEL
+      <span class="sub">SINCE START</span>
+      <span class="pill" id="pga-unit-pill">G</span>
+    </h2>
+    <canvas id="pga"></canvas>
+  </section>
+
+  <section class="panel parti">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
+    <h2>
+      PARTICLE MOTION
+      <span class="sub">X–Y PLANE · 2.5 S</span>
+      <span class="pill">TRAIL</span>
+    </h2>
+    <canvas id="parti"></canvas>
+  </section>
+
+  <aside class="side">
     <section class="panel">
-      <h2>PEAK GROUND ACCEL <span class="pill">since start</span></h2>
+      <span class="bracket tl"></span><span class="bracket tr"></span>
+      <span class="bracket bl"></span><span class="bracket br"></span>
+      <h2>READOUTS <span class="pill">LIVE</span></h2>
       <div class="readout">
         <div class="row" style="border-bottom:none; padding-bottom:0">
           <span class="val big" id="r-pga">0.0000</span>
-          <span class="val unit">g</span>
+          <span class="val unit">G</span>
         </div>
-        <div class="sub"><span id="r-pga-gal">—</span> gal · <span id="r-pga-ms2">—</span> m/s²</div>
+        <div class="sub"><span id="r-pga-gal">—</span> GAL · <span id="r-pga-ms2">—</span> M/S²</div>
         <div class="row">
-          <span class="label">RMS / 10 min</span>
+          <span class="label">RMS</span>
           <span class="val" id="r-rms">—</span>
         </div>
         <div class="row">
@@ -258,252 +502,651 @@
           <span class="val acc" id="r-stalta">—</span>
         </div>
         <div class="row">
-          <span class="label">TRIGGER @</span>
+          <span class="label">TRIG @</span>
           <span class="val" id="r-trig">—</span>
         </div>
         <div class="row">
-          <span class="label">RATE</span>
-          <span class="val" id="r-rate">— Hz</span>
+          <span class="label">SR</span>
+          <span class="val" id="r-rate">—</span>
+        </div>
+        <div class="mmi-wrap">
+          <div style="color:var(--label);font-size:10px;letter-spacing:0.12em">INTENSITY · MMI</div>
+          <div class="mmi-bar" id="mmi-bar">
+            <div class="cell" data-level="0"></div><div class="cell" data-level="1"></div>
+            <div class="cell" data-level="2"></div><div class="cell" data-level="3"></div>
+            <div class="cell" data-level="4"></div><div class="cell" data-level="5"></div>
+            <div class="cell" data-level="6"></div><div class="cell" data-level="7"></div>
+            <div class="cell" data-level="8"></div>
+          </div>
+          <div class="mmi-labels">
+            <span>I</span><span>II</span><span>III</span><span>IV</span>
+            <span>V</span><span>VI</span><span>VII</span><span>VIII</span><span>IX+</span>
+          </div>
+          <div class="mmi-desc" id="mmi-desc">NOT FELT</div>
         </div>
       </div>
-      <button style="margin-top:8px" onclick="resetPGA()">reset peak</button>
+      <button style="margin-top:10px;width:100%" onclick="resetPGA()">RESET PEAK</button>
     </section>
 
     <section class="panel" style="flex:1">
+      <span class="bracket tl"></span><span class="bracket tr"></span>
+      <span class="bracket bl"></span><span class="bracket br"></span>
       <h2>EVENT LOG <span class="pill"><span id="r-evcount">0</span></span></h2>
-      <div class="events" id="ev-list"><div class="empty">no events</div></div>
+      <div class="events" id="ev-list"><div class="empty">NO EVENTS LOGGED</div></div>
     </section>
   </aside>
 </main>
 
+<footer>
+  <div class="ticker" id="ticker">
+    <b>SIGNAL INTEGRITY OK</b><span>·</span>
+    <b>SENSOR BOSCH BMI286</b><span>·</span>
+    <b>AGGREGATION 100 HZ</b><span>·</span>
+    <b>HIGH-PASS 0.5 HZ</b><span>·</span>
+    <b>STA/LTA 0.5S / 10.0S</b><span>·</span>
+    <b>AUTHORIZED PERSONNEL ONLY</b><span>·</span>
+    <b>⚠ UNDOCUMENTED APPLE SPU IOKIT HID CHANNEL ⚠</b><span>·</span>
+    <b>SIGNAL INTEGRITY OK</b><span>·</span>
+    <b>SENSOR BOSCH BMI286</b><span>·</span>
+    <b>AGGREGATION 100 HZ</b><span>·</span>
+    <b>HIGH-PASS 0.5 HZ</b><span>·</span>
+    <b>STA/LTA 0.5S / 10.0S</b><span>·</span>
+    <b>AUTHORIZED PERSONNEL ONLY</b><span>·</span>
+    <b>⚠ UNDOCUMENTED APPLE SPU IOKIT HID CHANNEL ⚠</b>
+  </div>
+</footer>
+
+</div> <!-- /.hud -->
+
 <script>
 "use strict";
 
-// ─── Canvases ─────────────────────────────────────────────────
-const elHeli = document.getElementById('heli');
-const ctxHeli = elHeli.getContext('2d');
-const elTrace = document.getElementById('trace');
-const ctxTrace = elTrace.getContext('2d');
+// ─── Canvases ────────────────────────────────────────────────
+const cv = {
+  heli:  document.getElementById('heli'),
+  trace: document.getElementById('trace'),
+  spec:  document.getElementById('spec'),
+  pga:   document.getElementById('pga'),
+  parti: document.getElementById('parti'),
+};
+const cx = Object.fromEntries(Object.entries(cv).map(([k,c]) => [k, c.getContext('2d')]));
 
 function fit(c) {
   const r = c.getBoundingClientRect();
   c.width  = Math.floor(r.width  * devicePixelRatio);
   c.height = Math.floor(r.height * devicePixelRatio);
 }
-function fitAll() { fit(elHeli); fit(elTrace); }
+function fitAll() { Object.values(cv).forEach(fit); }
 window.addEventListener('resize', fitAll);
 fitAll();
 
-// ─── State ────────────────────────────────────────────────────
+// ─── State ───────────────────────────────────────────────────
 let latest = null;
+const specHistory = []; // rolling frames of FFT magnitudes
+const SPEC_HISTORY_COLS = 180;
+const SPEC_BINS = 64; // first 64 bins of 128-bin half-spectrum
 
-// ─── Helpers ──────────────────────────────────────────────────
-function pad(n) { return String(n).padStart(2, '0'); }
+// ─── Helpers ─────────────────────────────────────────────────
+const pad = (n) => String(n).padStart(2, '0');
 function fmtHMS(sec) {
   sec = Math.max(0, Math.floor(sec));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad((sec/3600)|0)}:${pad(((sec%3600)/60)|0)}:${pad(sec%60)}`;
 }
 function fmtUTC(d) {
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 function fmtG(v, digits=4) { return (v >= 0 ? ' ' : '') + v.toFixed(digits); }
 
-// ─── Helicorder ──────────────────────────────────────────────
+// ─── Radix-2 FFT (real input, Hann window) ───────────────────
+function fftMag(input) {
+  const N = input.length;
+  if (N < 2 || (N & (N - 1)) !== 0) return null;
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
+    re[i] = input[i] * w;
+  }
+  for (let i = 1, j = 0; i < N; i++) {
+    let bit = N >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      const tr = re[i]; re[i] = re[j]; re[j] = tr;
+      const ti = im[i]; im[i] = im[j]; im[j] = ti;
+    }
+  }
+  for (let size = 2; size <= N; size <<= 1) {
+    const half = size >> 1;
+    for (let i = 0; i < N; i += size) {
+      for (let k = 0; k < half; k++) {
+        const angle = -2 * Math.PI * k / size;
+        const wR = Math.cos(angle), wI = Math.sin(angle);
+        const xR = re[i + k], xI = im[i + k];
+        const yR = re[i + k + half], yI = im[i + k + half];
+        const tR = yR * wR - yI * wI;
+        const tI = yR * wI + yI * wR;
+        re[i + k] = xR + tR;
+        im[i + k] = xI + tI;
+        re[i + k + half] = xR - tR;
+        im[i + k + half] = xI - tI;
+      }
+    }
+  }
+  const nOut = (N >> 1) + 1;
+  const out = new Float64Array(nOut);
+  const scale = 2 / N;
+  for (let i = 0; i < nOut; i++) {
+    out[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]) * scale;
+  }
+  return out;
+}
+
+function computeSpectrumFromRecent(recent) {
+  if (!recent || recent.length < 64) return;
+  // Nearest power of 2 ≤ length, max 256
+  let N = 256;
+  while (N > recent.length) N >>= 1;
+  if (N < 64) return;
+  const buf = new Float64Array(N);
+  const start = recent.length - N;
+  // Use magnitude with mean removed
+  let mean = 0;
+  for (let i = 0; i < N; i++) { buf[i] = recent[start + i].m; mean += buf[i]; }
+  mean /= N;
+  for (let i = 0; i < N; i++) buf[i] -= mean;
+  const mag = fftMag(buf);
+  if (!mag) return;
+  // Keep first SPEC_BINS bins (≈0-25Hz when N=256, rate=100Hz)
+  const frame = new Float64Array(SPEC_BINS);
+  for (let i = 0; i < SPEC_BINS && i < mag.length; i++) frame[i] = mag[i];
+  specHistory.push(frame);
+  while (specHistory.length > SPEC_HISTORY_COLS) specHistory.shift();
+}
+
+// ─── Drawing: Helicorder ─────────────────────────────────────
 function drawHelicorder(samples, snap) {
-  const W = elHeli.width, H = elHeli.height;
-  ctxHeli.clearRect(0, 0, W, H);
-  ctxHeli.fillStyle = '#04060a';
-  ctxHeli.fillRect(0, 0, W, H);
+  const C = cv.heli, ctx = cx.heli;
+  const W = C.width, H = C.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
   if (!samples || samples.length < 2) return;
 
-  const ROWS = 10;
-  const ROW_SEC = 60;
-  const TOTAL_SEC = ROWS * ROW_SEC;
-
+  const ROWS = 10, ROW_SEC = 60, TOTAL = ROWS * ROW_SEC;
   const tEnd = samples[samples.length - 1].t;
-  const tStart = tEnd - TOTAL_SEC;
+  const tStart = tEnd - TOTAL;
   const rowH = H / ROWS;
   const labelW = 70 * devicePixelRatio;
   const plotW = W - labelW - (8 * devicePixelRatio);
 
-  // auto-scale
   let peak = 0.01;
-  samples.forEach(s => { if (s.t >= tStart && s.m > peak) peak = s.m; });
+  for (const s of samples) if (s.t >= tStart && s.m > peak) peak = s.m;
 
-  // grid
-  ctxHeli.strokeStyle = 'rgba(30, 44, 62, 0.45)';
-  ctxHeli.lineWidth = 1;
-  ctxHeli.beginPath();
+  // Grid
+  ctx.strokeStyle = 'rgba(36, 52, 73, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
   for (let i = 0; i <= ROWS; i++) {
     const y = (i * rowH) | 0;
-    ctxHeli.moveTo(labelW, y + 0.5); ctxHeli.lineTo(W, y + 0.5);
+    ctx.moveTo(labelW, y + 0.5); ctx.lineTo(W, y + 0.5);
   }
   for (let i = 0; i <= 6; i++) {
     const x = labelW + ((plotW * i / 6) | 0);
-    ctxHeli.moveTo(x + 0.5, 0); ctxHeli.lineTo(x + 0.5, H);
+    ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H);
   }
-  ctxHeli.stroke();
+  ctx.stroke();
 
-  // time conversion (server "seconds since start" → wall clock)
   const startUnix = (snap.stats && snap.stats.start_unix) || (Date.now() / 1000);
   const tToWall = (t) => new Date((startUnix + t) * 1000);
 
   for (let row = 0; row < ROWS; row++) {
-    const rowTStart = tStart + row * ROW_SEC;
-    const rowTEnd = rowTStart + ROW_SEC;
+    const rs = tStart + row * ROW_SEC;
+    const re2 = rs + ROW_SEC;
     const yMid = row * rowH + rowH / 2;
 
-    // time label
-    const wall = tToWall(rowTStart);
-    const label = `${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`;
-    ctxHeli.fillStyle = '#5b6b7d';
-    ctxHeli.font = `${11 * devicePixelRatio}px ui-monospace, monospace`;
-    ctxHeli.textBaseline = 'middle';
-    ctxHeli.fillText(label, 8 * devicePixelRatio, yMid);
+    const wall = tToWall(rs);
+    ctx.fillStyle = '#5a6a82';
+    ctx.font = `${11 * devicePixelRatio}px ui-monospace, monospace`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`,
+                 8 * devicePixelRatio, yMid);
 
-    const rowPts = samples.filter(s => s.t >= rowTStart && s.t < rowTEnd);
+    const rowPts = samples.filter(s => s.t >= rs && s.t < re2);
     if (rowPts.length < 2) continue;
 
-    // trace
-    ctxHeli.strokeStyle = '#ffb347';
-    ctxHeli.lineWidth = 1 * devicePixelRatio;
-    ctxHeli.beginPath();
+    // Trace with amber glow
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = 'rgba(255, 178, 28, 0.6)';
+    ctx.strokeStyle = '#ffb21c';
+    ctx.lineWidth = 1 * devicePixelRatio;
+    ctx.beginPath();
     rowPts.forEach((s, i) => {
-      const x = labelW + ((s.t - rowTStart) / ROW_SEC) * plotW;
+      const x = labelW + ((s.t - rs) / ROW_SEC) * plotW;
       const amp = (s.m / peak) * (rowH * 0.48);
       const sign = i % 2 === 0 ? 1 : -1;
       const y = yMid - sign * amp;
-      if (i === 0) ctxHeli.moveTo(x, y);
-      else ctxHeli.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    ctxHeli.stroke();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // event markers on this row
+    // Event markers
     const quakes = (snap.quakes) || [];
-    quakes.forEach(q => {
-      if (q.t < rowTStart || q.t >= rowTEnd) return;
-      const x = labelW + ((q.t - rowTStart) / ROW_SEC) * plotW;
-      ctxHeli.strokeStyle = '#ff4f6a';
-      ctxHeli.lineWidth = 2 * devicePixelRatio;
-      ctxHeli.beginPath();
-      ctxHeli.moveTo(x, row * rowH + 2);
-      ctxHeli.lineTo(x, (row + 1) * rowH - 2);
-      ctxHeli.stroke();
-    });
+    for (const q of quakes) {
+      if (q.t < rs || q.t >= re2) continue;
+      const x = labelW + ((q.t - rs) / ROW_SEC) * plotW;
+      ctx.strokeStyle = '#ff3040';
+      ctx.lineWidth = 2 * devicePixelRatio;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#ff3040';
+      ctx.beginPath();
+      ctx.moveTo(x, row * rowH + 2);
+      ctx.lineTo(x, (row + 1) * rowH - 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
   }
 
-  // scale label
-  ctxHeli.fillStyle = '#5b6b7d';
-  ctxHeli.font = `${10 * devicePixelRatio}px ui-monospace`;
-  ctxHeli.textBaseline = 'top';
-  ctxHeli.fillText(`peak ${peak.toFixed(3)}g`, W - (90 * devicePixelRatio), 6 * devicePixelRatio);
+  ctx.fillStyle = '#8096b0';
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctx.textBaseline = 'top';
+  ctx.fillText(`PEAK ${peak.toFixed(3)} G`,
+               W - (110 * devicePixelRatio), 6 * devicePixelRatio);
 }
 
-// ─── 3-axis waveform ─────────────────────────────────────────
-function drawGridLines(ctx, W, H, cols, rows) {
-  ctx.strokeStyle = 'rgba(30, 44, 62, 0.55)';
+// ─── Drawing: 3-axis Waveform ────────────────────────────────
+function drawTrace(samples) {
+  const C = cv.trace, ctx = cx.trace;
+  const W = C.width, H = C.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(36, 52, 73, 0.5)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let i = 1; i < cols; i++) {
-    const x = (W * i / cols) | 0;
+  for (let i = 1; i < 6; i++) {
+    const x = (W * i / 6) | 0;
     ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H);
   }
-  for (let i = 1; i < rows; i++) {
-    const y = (H * i / rows) | 0;
+  for (let i = 1; i < 6; i++) {
+    const y = (H * i / 6) | 0;
     ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5);
   }
   ctx.stroke();
-}
-
-function drawTrace(samples) {
-  const W = elTrace.width, H = elTrace.height;
-  ctxTrace.clearRect(0, 0, W, H);
-  ctxTrace.fillStyle = '#04060a';
-  ctxTrace.fillRect(0, 0, W, H);
-  drawGridLines(ctxTrace, W, H, 6, 6);
 
   if (!samples || samples.length < 2) return;
-
   const tEnd = samples[samples.length - 1].t;
   const win = samples.filter(s => s.t >= tEnd - 60);
   if (win.length < 2) return;
 
   const tracks = [
     { key: 'hx', color: '#4be0ff', label: 'X' },
-    { key: 'hy', color: '#ffb347', label: 'Y' },
-    { key: 'hz', color: '#66d9a4', label: 'Z' },
+    { key: 'hy', color: '#ffb21c', label: 'Y' },
+    { key: 'hz', color: '#3dff85', label: 'Z' },
   ];
   const rowH = H / 3;
   const scale = (rowH * 0.45) / 0.5;
 
   tracks.forEach((tr, i) => {
     const yMid = i * rowH + rowH / 2;
+    ctx.strokeStyle = 'rgba(36, 52, 73, 0.8)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, yMid); ctx.lineTo(W, yMid);
+    ctx.stroke();
 
-    ctxTrace.strokeStyle = 'rgba(30, 44, 62, 0.9)';
-    ctxTrace.lineWidth = 1;
-    ctxTrace.beginPath();
-    ctxTrace.moveTo(0, yMid); ctxTrace.lineTo(W, yMid);
-    ctxTrace.stroke();
-
-    ctxTrace.strokeStyle = tr.color;
-    ctxTrace.lineWidth = 1.2 * devicePixelRatio;
-    ctxTrace.beginPath();
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = tr.color;
+    ctx.strokeStyle = tr.color;
+    ctx.lineWidth = 1.3 * devicePixelRatio;
+    ctx.beginPath();
     win.forEach((s, k) => {
       const x = (k / (win.length - 1)) * W;
       const y = yMid - s[tr.key] * scale;
-      if (k === 0) ctxTrace.moveTo(x, y);
-      else ctxTrace.lineTo(x, y);
+      if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    ctxTrace.stroke();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    ctxTrace.fillStyle = tr.color;
-    ctxTrace.font = `bold ${12 * devicePixelRatio}px ui-monospace`;
-    ctxTrace.textBaseline = 'top';
-    ctxTrace.fillText(tr.label, 8 * devicePixelRatio, i * rowH + 6 * devicePixelRatio);
+    ctx.fillStyle = tr.color;
+    ctx.font = `bold ${12 * devicePixelRatio}px ui-monospace`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(tr.label, 8 * devicePixelRatio, i * rowH + 6 * devicePixelRatio);
   });
 
-  // time axis labels
-  ctxTrace.fillStyle = '#5b6b7d';
-  ctxTrace.font = `${10 * devicePixelRatio}px ui-monospace`;
-  ctxTrace.textBaseline = 'bottom';
+  ctx.fillStyle = '#5a6a82';
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctx.textBaseline = 'bottom';
   for (let s = 0; s <= 60; s += 10) {
     const x = W - (s / 60) * W;
-    ctxTrace.fillText(`-${s}s`, x + 4 * devicePixelRatio, H - 4 * devicePixelRatio);
+    ctx.fillText(`-${s}S`, x + 4 * devicePixelRatio, H - 4 * devicePixelRatio);
   }
 }
 
-// ─── Readouts ─────────────────────────────────────────────────
+// ─── Drawing: Spectrogram waterfall ──────────────────────────
+function drawSpectrogram() {
+  const C = cv.spec, ctx = cx.spec;
+  const W = C.width, H = C.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Y-axis label (frequency)
+  const labelW = 34 * devicePixelRatio;
+  const plotW = W - labelW;
+  const plotH = H - (14 * devicePixelRatio);
+
+  // Axis ticks (0, 5, 10, 15, 20, 25 Hz)
+  ctx.fillStyle = '#5a6a82';
+  ctx.font = `${9 * devicePixelRatio}px ui-monospace`;
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 5; i++) {
+    const hz = i * 5;
+    const y = plotH - (hz / 25) * plotH;
+    ctx.fillText(`${hz}`, 4 * devicePixelRatio, y);
+    ctx.strokeStyle = 'rgba(36, 52, 73, 0.3)';
+    ctx.beginPath();
+    ctx.moveTo(labelW, y + 0.5);
+    ctx.lineTo(W, y + 0.5);
+    ctx.stroke();
+  }
+
+  if (specHistory.length === 0) return;
+
+  // Global max for normalization
+  let maxVal = 0.0005;
+  for (const frame of specHistory) {
+    for (const v of frame) if (v > maxVal) maxVal = v;
+  }
+
+  const cols = specHistory.length;
+  const colW = plotW / SPEC_HISTORY_COLS;
+  const rowH = plotH / SPEC_BINS;
+
+  for (let c = 0; c < cols; c++) {
+    const frame = specHistory[c];
+    const x = labelW + (SPEC_HISTORY_COLS - cols + c) * colW;
+    for (let r = 0; r < SPEC_BINS; r++) {
+      const vNorm = Math.min(1, frame[r] / maxVal);
+      if (vNorm < 0.02) continue;
+      // Dark blue → cyan → amber → white hot colormap
+      let R, G, B;
+      if (vNorm < 0.25) {
+        const t = vNorm / 0.25;
+        R = 10 + t * 30; G = 20 + t * 80; B = 60 + t * 140;
+      } else if (vNorm < 0.6) {
+        const t = (vNorm - 0.25) / 0.35;
+        R = 40 + t * 180; G = 100 + t * 140; B = 200 - t * 100;
+      } else {
+        const t = (vNorm - 0.6) / 0.4;
+        R = 220 + t * 35; G = 240 - t * 50; B = 100 + t * 150;
+      }
+      ctx.fillStyle = `rgb(${R|0},${G|0},${B|0})`;
+      const y = plotH - (r + 1) * rowH;
+      ctx.fillRect(x, y, colW + 1, rowH + 1);
+    }
+  }
+
+  // HZ label
+  ctx.fillStyle = '#8096b0';
+  ctx.font = `${9 * devicePixelRatio}px ui-monospace`;
+  ctx.textBaseline = 'top';
+  ctx.fillText('HZ', 4 * devicePixelRatio, 4 * devicePixelRatio);
+  ctx.textAlign = 'right';
+  ctx.fillText('NOW →', W - 4 * devicePixelRatio, H - 12 * devicePixelRatio);
+  ctx.textAlign = 'left';
+}
+
+// ─── Drawing: Particle motion (X-Y) ──────────────────────────
+function drawParticle(recent) {
+  const C = cv.parti, ctx = cx.parti;
+  const W = C.width, H = C.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  const cX = W / 2, cY = H / 2;
+  const R = Math.min(W, H) * 0.42;
+
+  // Concentric scale rings
+  ctx.strokeStyle = 'rgba(36, 52, 73, 0.75)';
+  ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75, 1.0].forEach(r => {
+    ctx.beginPath();
+    ctx.arc(cX, cY, R * r, 0, 2 * Math.PI);
+    ctx.stroke();
+  });
+  // Crosshair
+  ctx.beginPath();
+  ctx.moveTo(0, cY); ctx.lineTo(W, cY);
+  ctx.moveTo(cX, 0); ctx.lineTo(cX, H);
+  ctx.stroke();
+
+  // Compass labels
+  ctx.fillStyle = '#5a6a82';
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+X', cX + R + 10 * devicePixelRatio, cY);
+  ctx.fillText('-X', cX - R - 10 * devicePixelRatio, cY);
+  ctx.fillText('+Y', cX, cY - R - 10 * devicePixelRatio);
+  ctx.fillText('-Y', cX, cY + R + 10 * devicePixelRatio);
+
+  if (!recent || recent.length < 2) return;
+
+  // Autoscale: find max |hx|, |hy|
+  let maxAbs = 0.01;
+  for (const s of recent) {
+    if (Math.abs(s.hx) > maxAbs) maxAbs = Math.abs(s.hx);
+    if (Math.abs(s.hy) > maxAbs) maxAbs = Math.abs(s.hy);
+  }
+  const scale = R / maxAbs;
+
+  // Trail: fade old points
+  for (let i = 1; i < recent.length; i++) {
+    const age = i / recent.length;
+    const a = age * age; // sharper fade
+    const x0 = cX + recent[i - 1].hx * scale;
+    const y0 = cY - recent[i - 1].hy * scale;
+    const x1 = cX + recent[i].hx * scale;
+    const y1 = cY - recent[i].hy * scale;
+    ctx.strokeStyle = `rgba(255, 178, 28, ${0.15 + a * 0.7})`;
+    ctx.lineWidth = (0.6 + a * 1.8) * devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+
+  // Current point
+  const last = recent[recent.length - 1];
+  const lx = cX + last.hx * scale;
+  const ly = cY - last.hy * scale;
+  ctx.fillStyle = '#4be0ff';
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = '#4be0ff';
+  ctx.beginPath();
+  ctx.arc(lx, ly, 4 * devicePixelRatio, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Scale label
+  ctx.fillStyle = '#8096b0';
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`SCL ±${maxAbs.toFixed(3)}G`, 6 * devicePixelRatio, 6 * devicePixelRatio);
+}
+
+// ─── Drawing: PGA semicircle gauge ───────────────────────────
+let gaugeDisplay = 0; // smoothed
+function drawGauge(pga) {
+  const C = cv.pga, ctx = cx.pga;
+  const W = C.width, H = C.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  const cX = W / 2, cY = H * 0.82;
+  const R = Math.min(W * 0.42, H * 0.78);
+
+  // Smooth needle (lag 0.2)
+  gaugeDisplay += (pga - gaugeDisplay) * 0.2;
+
+  const MAX_G = 0.5;
+  const frac = Math.min(1, Math.max(0, gaugeDisplay / MAX_G));
+
+  // Outer arc (background)
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = '#0b1220';
+  ctx.lineWidth = 14 * devicePixelRatio;
+  ctx.beginPath();
+  ctx.arc(cX, cY, R, Math.PI, 2 * Math.PI);
+  ctx.stroke();
+
+  // Color zones (green/amber/red) along the arc
+  const zones = [
+    { from: 0.0,  to: 0.2, color: '#3dff85' },
+    { from: 0.2,  to: 0.6, color: '#ffb21c' },
+    { from: 0.6,  to: 1.0, color: '#ff3040' },
+  ];
+  ctx.lineWidth = 14 * devicePixelRatio;
+  for (const z of zones) {
+    const a1 = Math.PI + z.from * Math.PI;
+    const a2 = Math.PI + z.to * Math.PI;
+    ctx.strokeStyle = z.color;
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.arc(cX, cY, R, a1, a2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Value arc
+  ctx.strokeStyle = '#ffb21c';
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = '#ffb21c';
+  ctx.lineWidth = 14 * devicePixelRatio;
+  ctx.beginPath();
+  ctx.arc(cX, cY, R, Math.PI, Math.PI + frac * Math.PI);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Tick marks
+  for (let i = 0; i <= 10; i++) {
+    const angle = Math.PI + (i / 10) * Math.PI;
+    const inner = R + 10 * devicePixelRatio;
+    const outer = R + 20 * devicePixelRatio;
+    ctx.strokeStyle = i % 5 === 0 ? '#8096b0' : '#37465b';
+    ctx.lineWidth = (i % 5 === 0 ? 2 : 1) * devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(cX + Math.cos(angle) * inner, cY + Math.sin(angle) * inner);
+    ctx.lineTo(cX + Math.cos(angle) * outer, cY + Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+
+  // Needle
+  const needleAngle = Math.PI + frac * Math.PI;
+  ctx.strokeStyle = '#ffd66d';
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = '#ffb21c';
+  ctx.lineWidth = 3 * devicePixelRatio;
+  ctx.beginPath();
+  ctx.moveTo(cX, cY);
+  ctx.lineTo(cX + Math.cos(needleAngle) * (R - 4),
+             cY + Math.sin(needleAngle) * (R - 4));
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Hub
+  ctx.fillStyle = '#ffd66d';
+  ctx.beginPath();
+  ctx.arc(cX, cY, 5 * devicePixelRatio, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // Value text
+  ctx.fillStyle = '#ffb21c';
+  ctx.font = `bold ${30 * devicePixelRatio}px ui-monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'rgba(255, 178, 28, 0.5)';
+  ctx.fillText(pga.toFixed(4), cX, cY + 12 * devicePixelRatio);
+  ctx.shadowBlur = 0;
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
+  ctx.fillStyle = '#5a6a82';
+  ctx.fillText(`G · MAX ${MAX_G.toFixed(1)}`, cX, cY + 46 * devicePixelRatio);
+
+  // Zone labels
+  ctx.font = `${9 * devicePixelRatio}px ui-monospace`;
+  ctx.fillStyle = '#3dff85';
+  ctx.textAlign = 'center';
+  const labelAt = (frac, color, text) => {
+    const a = Math.PI + frac * Math.PI;
+    const lr = R + 32 * devicePixelRatio;
+    ctx.fillStyle = color;
+    ctx.fillText(text, cX + Math.cos(a) * lr, cY + Math.sin(a) * lr);
+  };
+  labelAt(0.1, '#3dff85', 'OK');
+  labelAt(0.4, '#ffb21c', 'WARN');
+  labelAt(0.85, '#ff3040', 'DANGER');
+}
+
+// ─── MMI classification (Wald et al. 1999, approximate) ────
+function pgaToMMI(pga) {
+  // Returns { level: 0..8, roman, name }
+  const t = [
+    { max: 0.0017, lv: 0, r: 'I-II',  n: 'NOT FELT' },
+    { max: 0.014,  lv: 2, r: 'III',   n: 'WEAK' },
+    { max: 0.039,  lv: 3, r: 'IV',    n: 'LIGHT' },
+    { max: 0.092,  lv: 4, r: 'V',     n: 'MODERATE' },
+    { max: 0.18,   lv: 5, r: 'VI',    n: 'STRONG' },
+    { max: 0.34,   lv: 6, r: 'VII',   n: 'VERY STRONG' },
+    { max: 0.65,   lv: 7, r: 'VIII',  n: 'SEVERE' },
+    { max: 1.24,   lv: 8, r: 'IX',    n: 'VIOLENT' },
+  ];
+  for (const e of t) if (pga < e.max) return e;
+  return { lv: 8, r: 'X+', n: 'EXTREME' };
+}
+function updateMMI(pga) {
+  const m = pgaToMMI(pga);
+  const cells = document.querySelectorAll('#mmi-bar .cell');
+  cells.forEach((c, i) => c.classList.toggle('on', i <= m.lv));
+  document.getElementById('mmi-desc').textContent = `MMI ${m.r} · ${m.n}`;
+}
+
+// ─── Readouts ────────────────────────────────────────────────
 function updateReadouts(snap) {
   const s = snap.stats || {};
   document.getElementById('r-pga').textContent     = fmtG(s.pga || 0, 4);
   document.getElementById('r-pga-gal').textContent = (s.pga_gal || 0).toFixed(3);
   document.getElementById('r-pga-ms2').textContent = (s.pga_ms2 || 0).toFixed(4);
-  document.getElementById('r-rms').textContent     = fmtG(s.rms || 0, 5) + ' g';
-  const ratio = s.sta_lta || 0;
-  const trig  = s.trigger || 4;
+  document.getElementById('r-rms').textContent     = fmtG(s.rms || 0, 5) + ' G';
+  const ratio = s.sta_lta || 0, trig = s.trigger || 4;
   const rEl = document.getElementById('r-stalta');
   rEl.textContent = ratio.toFixed(2);
   rEl.classList.toggle('warn', ratio > trig);
   document.getElementById('r-trig').textContent = trig.toFixed(1) + '×';
-  document.getElementById('r-rate').textContent = (s.rate_hz || 0) + ' Hz';
-
+  document.getElementById('r-rate').textContent = (s.rate_hz || 0) + ' HZ';
   document.getElementById('m-host').textContent = s.host || 'local';
   document.getElementById('m-uptime').textContent = fmtHMS(s.uptime_s || 0);
-  document.getElementById('m-samples').textContent =
-    (s.filled || 0).toLocaleString();
+  document.getElementById('m-samples').textContent = (s.filled || 0).toLocaleString();
 
   const dot = document.getElementById('dot');
   const statusEl = document.getElementById('m-status');
+  const alertEl = document.getElementById('alert');
   if (ratio > trig) {
     dot.className = 'dot alert';
     statusEl.textContent = 'EVENT';
+    alertEl.classList.add('on');
   } else {
     dot.className = 'dot';
     statusEl.textContent = 'LIVE';
+    alertEl.classList.remove('on');
   }
+
+  updateMMI(s.pga || 0);
 }
 
 function renderEvents(snap) {
@@ -511,43 +1154,61 @@ function renderEvents(snap) {
   const evs = (snap.quakes || []).slice().reverse();
   document.getElementById('r-evcount').textContent = (snap.quakes || []).length;
   if (evs.length === 0) {
-    list.innerHTML = '<div class="empty">no events</div>';
+    list.innerHTML = '<div class="empty">NO EVENTS LOGGED</div>';
     return;
   }
   const s = snap.stats || {};
   const startUnix = s.start_unix || (Date.now() / 1000);
   list.innerHTML = evs.map(q => {
     const wall = new Date((startUnix + q.t) * 1000);
-    const hms = fmtUTC(wall);
     return `<div class="item">
-      <span class="t">${hms}</span>
-      <span>${q.peak.toFixed(3)}g · ${q.ratio.toFixed(1)}×</span>
+      <span class="t">${fmtUTC(wall)}</span>
+      <span>${q.peak.toFixed(3)}G · ${q.ratio.toFixed(1)}×</span>
     </div>`;
   }).join('');
 }
 
-// ─── Main render loop ────────────────────────────────────────
+// ─── Tremor (HUD shake based on live sensor) ────────────────
+function applyTremor(recent) {
+  if (!recent || recent.length === 0) return;
+  const last = recent[recent.length - 1];
+  // 0.01g → 12px. Clamp so huge spikes don't break layout.
+  const K = 1200;
+  const tx = Math.max(-18, Math.min(18, last.hx * K));
+  const ty = Math.max(-18, Math.min(18, -last.hy * K));
+  document.getElementById('hud').style.transform = `translate(${tx}px, ${ty}px)`;
+}
+
+// ─── Main render loop ───────────────────────────────────────
 function render() {
   if (latest) {
     drawHelicorder(latest.samples || [], latest);
     drawTrace(latest.samples || []);
+    drawSpectrogram();
+    drawParticle(latest.recent || []);
+    drawGauge((latest.stats || {}).pga || 0);
     updateReadouts(latest);
     renderEvents(latest);
+    applyTremor(latest.recent || []);
   }
   document.getElementById('m-clock').textContent = fmtUTC(new Date());
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
 
-// ─── Stream ──────────────────────────────────────────────────
-// /stream already decimates, but we want the full 10-minute window, so we
-// also poll /state?decim=60 which gives us 1000 points (enough for helicorder).
-setInterval(async () => {
+// ─── Poll /state — drives everything ────────────────────────
+async function poll() {
   try {
     const r = await fetch('/state?decim=60');
-    if (r.ok) latest = await r.json();
+    if (r.ok) {
+      latest = await r.json();
+      // Feed FFT history
+      computeSpectrumFromRecent(latest.recent);
+    }
   } catch {}
-}, 500);
+}
+setInterval(poll, 250); // 4 Hz
+poll();
 
 async function resetPGA() {
   try { await fetch('/reset', { method: 'POST' }); } catch {}
