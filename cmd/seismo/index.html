@@ -678,103 +678,102 @@ function drawHelicorder(samples, snap) {
   ctx.fillRect(0, 0, W, H);
   if (!samples || samples.length < 2) return;
 
-  const ROWS = 10, ROW_SEC = 60, TOTAL = ROWS * ROW_SEC;
+  const TOTAL = 10 * 60;
   const tEnd = samples[samples.length - 1].t;
   const tStart = tEnd - TOTAL;
-  const rowH = H / ROWS;
-  const labelW = 70 * devicePixelRatio;
-  const plotW = W - labelW - (8 * devicePixelRatio);
+  const padL = 18 * devicePixelRatio;
+  const padR = 16 * devicePixelRatio;
+  const padT = 18 * devicePixelRatio;
+  const padB = 24 * devicePixelRatio;
+  const plotX = padL;
+  const plotY = padT;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const yMid = plotY + plotH / 2;
+  const win = samples.filter(s => s.t >= tStart);
+  if (win.length < 2) return;
 
+  const axis = dominantAxis(win);
   let peakAbs = 0.0025;
-  for (const s of samples) {
-    if (s.t < tStart) continue;
-    peakAbs = Math.max(peakAbs, Math.abs(s.hx), Math.abs(s.hy), Math.abs(s.hz));
-  }
+  for (const s of win) peakAbs = Math.max(peakAbs, Math.abs(s[axis.key]));
+  const ref = Math.max(0.0012, peakAbs * 0.34);
 
   // Grid
   ctx.strokeStyle = 'rgba(36, 52, 73, 0.55)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let i = 0; i <= ROWS; i++) {
-    const y = (i * rowH) | 0;
-    ctx.moveTo(labelW, y + 0.5); ctx.lineTo(W, y + 0.5);
+  for (let i = 0; i <= 6; i++) {
+    const y = plotY + ((plotH * i) / 6 | 0);
+    ctx.moveTo(plotX, y + 0.5);
+    ctx.lineTo(plotX + plotW, y + 0.5);
   }
   for (let i = 0; i <= 6; i++) {
-    const x = labelW + ((plotW * i / 6) | 0);
-    ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H);
+    const x = plotX + ((plotW * i) / 6 | 0);
+    ctx.moveTo(x + 0.5, plotY);
+    ctx.lineTo(x + 0.5, plotY + plotH);
   }
   ctx.stroke();
 
-  const startUnix = (snap.stats && snap.stats.start_unix) || (Date.now() / 1000);
-  const tToWall = (t) => new Date((startUnix + t) * 1000);
+  // Center line
+  ctx.strokeStyle = 'rgba(128, 150, 176, 0.28)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(plotX, yMid + 0.5);
+  ctx.lineTo(plotX + plotW, yMid + 0.5);
+  ctx.stroke();
 
-  for (let row = 0; row < ROWS; row++) {
-    const rs = tStart + row * ROW_SEC;
-    const re2 = rs + ROW_SEC;
-    const yMid = row * rowH + rowH / 2;
+  // Single flowing stock-chart-like line.
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = axis.glow;
+  ctx.strokeStyle = axis.color;
+  ctx.lineWidth = 1.6 * devicePixelRatio;
+  ctx.beginPath();
+  win.forEach((s, i) => {
+    const x = plotX + ((s.t - tStart) / TOTAL) * plotW;
+    const amp = boostedCenteredWave(s[axis.key], ref) * (plotH * 0.46);
+    const y = yMid - amp;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.shadowBlur = 0;
 
-    const wall = tToWall(rs);
-    ctx.fillStyle = '#5a6a82';
-    ctx.font = `${11 * devicePixelRatio}px ui-monospace, monospace`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`,
-                 8 * devicePixelRatio, yMid);
-
-    const rowPts = samples.filter(s => s.t >= rs && s.t < re2);
-    if (rowPts.length < 2) continue;
-    const axis = dominantAxis(rowPts);
-    let rowPeakAbs = 0.0025;
-    for (const s of rowPts) rowPeakAbs = Math.max(rowPeakAbs, Math.abs(s[axis.key]));
-    const ref = Math.max(0.0015, rowPeakAbs * 0.55);
-
-    ctx.strokeStyle = 'rgba(128, 150, 176, 0.22)';
-    ctx.lineWidth = 1;
+  // Event markers
+  const quakes = snap.quakes || [];
+  for (const q of quakes) {
+    if (q.t < tStart || q.t >= tEnd) continue;
+    const x = plotX + ((q.t - tStart) / TOTAL) * plotW;
+    ctx.strokeStyle = '#ff3040';
+    ctx.lineWidth = 2 * devicePixelRatio;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ff3040';
     ctx.beginPath();
-    ctx.moveTo(labelW, yMid + 0.5);
-    ctx.lineTo(W, yMid + 0.5);
-    ctx.stroke();
-
-    ctx.fillStyle = axis.color;
-    ctx.font = `${9 * devicePixelRatio}px ui-monospace, monospace`;
-    ctx.fillText(axis.label, labelW - (16 * devicePixelRatio), yMid);
-
-    // Centered, boosted waveform using the dominant axis on this row.
-    ctx.shadowBlur = 6;
-    ctx.shadowColor = axis.glow;
-    ctx.strokeStyle = axis.color;
-    ctx.lineWidth = 1.35 * devicePixelRatio;
-    ctx.beginPath();
-    rowPts.forEach((s, i) => {
-      const x = labelW + ((s.t - rs) / ROW_SEC) * plotW;
-      const amp = boostedCenteredWave(s[axis.key], ref) * (rowH * 0.47);
-      const y = yMid - amp;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
+    ctx.moveTo(x, plotY + 2);
+    ctx.lineTo(x, plotY + plotH - 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
-
-    // Event markers
-    const quakes = (snap.quakes) || [];
-    for (const q of quakes) {
-      if (q.t < rs || q.t >= re2) continue;
-      const x = labelW + ((q.t - rs) / ROW_SEC) * plotW;
-      ctx.strokeStyle = '#ff3040';
-      ctx.lineWidth = 2 * devicePixelRatio;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = '#ff3040';
-      ctx.beginPath();
-      ctx.moveTo(x, row * rowH + 2);
-      ctx.lineTo(x, (row + 1) * rowH - 2);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
   }
 
+  // Time labels
+  const startUnix = (snap.stats && snap.stats.start_unix) || (Date.now() / 1000);
+  ctx.fillStyle = '#5a6a82';
+  ctx.font = `${10 * devicePixelRatio}px ui-monospace, monospace`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 6; i++) {
+    const t = tStart + (TOTAL * i / 6);
+    const wall = new Date((startUnix + t) * 1000);
+    const x = plotX + (plotW * i / 6);
+    ctx.fillText(`${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}`, x, plotY + plotH + 6 * devicePixelRatio);
+  }
+
+  // Info tags
   ctx.fillStyle = '#8096b0';
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.textBaseline = 'top';
-  ctx.fillText(`CENTERED · MAX |A| ${peakAbs.toFixed(3)} G`,
-               W - (184 * devicePixelRatio), 6 * devicePixelRatio);
+  ctx.textAlign = 'left';
+  ctx.fillText(`FLOW · ${axis.label}-AXIS · ±${peakAbs.toFixed(3)} G`, plotX, 4 * devicePixelRatio);
+  ctx.textAlign = 'right';
+  ctx.fillText(`WINDOW 10 MIN`, W - padR, 4 * devicePixelRatio);
 }
 
 // ─── Drawing: 3-axis Waveform ────────────────────────────────
