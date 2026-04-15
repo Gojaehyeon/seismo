@@ -436,7 +436,7 @@
     <span class="bracket bl"></span><span class="bracket br"></span>
     <h2>
       PEAK GROUND ACCEL
-      <span class="sub">SINCE START</span>
+      <span class="sub">LIVE PEAK · DECAY</span>
       <span class="pill" id="pga-unit-pill">G</span>
     </h2>
     <canvas id="pga"></canvas>
@@ -556,6 +556,11 @@ let latest = null;
 const specHistory = []; // rolling frames of FFT magnitudes
 const SPEC_HISTORY_COLS = 180;
 const SPEC_BINS = 64; // first 64 bins of 128-bin half-spectrum
+const AXES = [
+  { key: 'hx', color: '#4be0ff', glow: 'rgba(75, 224, 255, 0.65)', label: 'X' },
+  { key: 'hy', color: '#ffb21c', glow: 'rgba(255, 178, 28, 0.65)', label: 'Y' },
+  { key: 'hz', color: '#3dff85', glow: 'rgba(61, 255, 133, 0.70)', label: 'Z' },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────
 const pad = (n) => String(n).padStart(2, '0');
@@ -635,6 +640,35 @@ function computeSpectrumFromRecent(recent) {
   while (specHistory.length > SPEC_HISTORY_COLS) specHistory.shift();
 }
 
+function dominantAxis(rowPts) {
+  let best = AXES[0];
+  let bestEnergy = -1;
+  for (const axis of AXES) {
+    let sumSq = 0;
+    for (const s of rowPts) sumSq += s[axis.key] * s[axis.key];
+    if (sumSq > bestEnergy) {
+      best = axis;
+      bestEnergy = sumSq;
+    }
+  }
+  return best;
+}
+
+function boostedCenteredWave(v, ref) {
+  const n = Math.max(-1, Math.min(1, v / ref));
+  return Math.sign(n) * Math.pow(Math.abs(n), 0.72);
+}
+
+function recentPeakMagnitude(recent) {
+  if (!recent || recent.length === 0) return 0;
+  let peak = 0;
+  const start = Math.max(0, recent.length - 12);
+  for (let i = start; i < recent.length; i++) {
+    if (recent[i].m > peak) peak = recent[i].m;
+  }
+  return peak;
+}
+
 // ─── Drawing: Helicorder ─────────────────────────────────────
 function drawHelicorder(samples, snap) {
   const C = cv.heli, ctx = cx.heli;
@@ -651,8 +685,11 @@ function drawHelicorder(samples, snap) {
   const labelW = 70 * devicePixelRatio;
   const plotW = W - labelW - (8 * devicePixelRatio);
 
-  let peak = 0.01;
-  for (const s of samples) if (s.t >= tStart && s.m > peak) peak = s.m;
+  let peakAbs = 0.0025;
+  for (const s of samples) {
+    if (s.t < tStart) continue;
+    peakAbs = Math.max(peakAbs, Math.abs(s.hx), Math.abs(s.hy), Math.abs(s.hz));
+  }
 
   // Grid
   ctx.strokeStyle = 'rgba(36, 52, 73, 0.55)';
@@ -685,18 +722,32 @@ function drawHelicorder(samples, snap) {
 
     const rowPts = samples.filter(s => s.t >= rs && s.t < re2);
     if (rowPts.length < 2) continue;
+    const axis = dominantAxis(rowPts);
+    let rowPeakAbs = 0.0025;
+    for (const s of rowPts) rowPeakAbs = Math.max(rowPeakAbs, Math.abs(s[axis.key]));
+    const ref = Math.max(0.0015, rowPeakAbs * 0.55);
 
-    // Trace with green glow
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = 'rgba(61, 255, 133, 0.65)';
-    ctx.strokeStyle = '#3dff85';
-    ctx.lineWidth = 1.2 * devicePixelRatio;
+    ctx.strokeStyle = 'rgba(128, 150, 176, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(labelW, yMid + 0.5);
+    ctx.lineTo(W, yMid + 0.5);
+    ctx.stroke();
+
+    ctx.fillStyle = axis.color;
+    ctx.font = `${9 * devicePixelRatio}px ui-monospace, monospace`;
+    ctx.fillText(axis.label, labelW - (16 * devicePixelRatio), yMid);
+
+    // Centered, boosted waveform using the dominant axis on this row.
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = axis.glow;
+    ctx.strokeStyle = axis.color;
+    ctx.lineWidth = 1.35 * devicePixelRatio;
     ctx.beginPath();
     rowPts.forEach((s, i) => {
       const x = labelW + ((s.t - rs) / ROW_SEC) * plotW;
-      const amp = (s.m / peak) * (rowH * 0.48);
-      const sign = i % 2 === 0 ? 1 : -1;
-      const y = yMid - sign * amp;
+      const amp = boostedCenteredWave(s[axis.key], ref) * (rowH * 0.47);
+      const y = yMid - amp;
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
@@ -722,8 +773,8 @@ function drawHelicorder(samples, snap) {
   ctx.fillStyle = '#8096b0';
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.textBaseline = 'top';
-  ctx.fillText(`PEAK ${peak.toFixed(3)} G`,
-               W - (110 * devicePixelRatio), 6 * devicePixelRatio);
+  ctx.fillText(`CENTERED · MAX |A| ${peakAbs.toFixed(3)} G`,
+               W - (184 * devicePixelRatio), 6 * devicePixelRatio);
 }
 
 // ─── Drawing: 3-axis Waveform ────────────────────────────────
@@ -952,8 +1003,9 @@ function drawParticle(recent) {
 }
 
 // ─── Drawing: PGA semicircle gauge ───────────────────────────
-let gaugeDisplay = 0; // smoothed
-function drawGauge(pga) {
+let gaugeDisplay = 0;
+let gaugeLastFrame = performance.now();
+function drawGauge(recent, peakPGA) {
   const C = cv.pga, ctx = cx.pga;
   const W = C.width, H = C.height;
   ctx.clearRect(0, 0, W, H);
@@ -963,8 +1015,18 @@ function drawGauge(pga) {
   const cX = W / 2, cY = H * 0.82;
   const R = Math.min(W * 0.42, H * 0.78);
 
-  // Smooth needle (snappier response)
-  gaugeDisplay += (pga - gaugeDisplay) * 0.35;
+  // Ballistic peak hold: slam upward on impact, then bleed down.
+  const now = performance.now();
+  const dt = Math.min(0.1, Math.max(0.001, (now - gaugeLastFrame) / 1000));
+  gaugeLastFrame = now;
+  const livePeak = recentPeakMagnitude(recent);
+  const attack = 1 - Math.exp(-dt / 0.045);
+  const release = Math.exp(-dt / 1.35);
+  if (livePeak >= gaugeDisplay) {
+    gaugeDisplay += (livePeak - gaugeDisplay) * attack;
+  } else {
+    gaugeDisplay *= release;
+  }
 
   const MAX_G = 0.5;
   const frac = Math.min(1, Math.max(0, gaugeDisplay / MAX_G));
@@ -1043,11 +1105,11 @@ function drawGauge(pga) {
   ctx.textBaseline = 'top';
   ctx.shadowBlur = 10;
   ctx.shadowColor = 'rgba(255, 178, 28, 0.5)';
-  ctx.fillText(pga.toFixed(4), cX, cY + 12 * devicePixelRatio);
+  ctx.fillText(gaugeDisplay.toFixed(4), cX, cY + 12 * devicePixelRatio);
   ctx.shadowBlur = 0;
   ctx.font = `${10 * devicePixelRatio}px ui-monospace`;
   ctx.fillStyle = '#5a6a82';
-  ctx.fillText(`G · MAX ${MAX_G.toFixed(1)}`, cX, cY + 46 * devicePixelRatio);
+  ctx.fillText(`LIVE HOLD · TRUE MAX ${peakPGA.toFixed(4)} G`, cX, cY + 46 * devicePixelRatio);
 
   // Zone labels
   ctx.font = `${9 * devicePixelRatio}px ui-monospace`;
@@ -1143,7 +1205,7 @@ function render() {
     drawTrace(latest.samples || []);
     drawSpectrogram();
     drawParticle(latest.recent || []);
-    drawGauge((latest.stats || {}).pga || 0);
+    drawGauge(latest.recent || [], (latest.stats || {}).pga || 0);
     updateReadouts(latest);
     renderEvents(latest);
   }
